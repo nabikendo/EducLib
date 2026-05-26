@@ -1,0 +1,6 @@
+{
+  "name": "Biblioteca Escolar",
+  "description": "Aplicativo offline para gerenciamento de biblioteca escolar, livros, empréstimos, devoluções e exportação de backups.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

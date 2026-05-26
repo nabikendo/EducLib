@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Subtle smooth drop shadow for elegant layered depth -->
+    <path
+        android:fillColor="#33000000"
+        android:pathData="M 54,44 C 49.5,39.5 38.5,39.5 28.5,43.5 L 28.5,73.5 C 38.5,69.5 49.5,69.5 54,73.5 C 58.5,69.5 69.5,69.5 79.5,73.5 L 79.5,43.5 C 69.5,39.5 58.5,39.5 54,44 Z" />
+
+    <!-- Open Book Cover (Clean White Page Backdrop) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 54,42 C 49.5,37.5 38.5,37.5 28.5,41.5 L 28.5,71.5 C 38.5,67.5 49.5,67.5 54,71.5 C 58.5,67.5 69.5,67.5 79.5,71.5 L 79.5,41.5 C 69.5,37.5 58.5,37.5 54,42 Z" />
+
+    <!-- Left Page Accent Lines (Theme Purple light tint) -->
+    <path
+        android:fillColor="#D1CADF"
+        android:pathData="M 34,47 H 49 V 48.5 H 34 Z M 34,51.5 H 49 V 53 H 34 Z M 34,56 H 44 V 57.5 H 34 Z" />
+
+    <!-- Right Page Accent Lines -->
+    <path
+        android:fillColor="#D1CADF"
+        android:pathData="M 59,47 H 74 V 48.5 H 59 Z M 59,51.5 H 74 V 53 H 59 Z M 59,56 H 69 V 57.5 H 59 Z" />
+
+    <!-- Central Bookmark Ribbon (M3 Lavender Accent matching theme) -->
+    <path
+        android:fillColor="#EADDFF"
+        android:pathData="M 52.5,40.5 L 52.5,63 L 54,61.5 L 55.5,63 L 55.5,40.5 Z" />
+
+    <!-- Micro shining star indicators for elegant academic touch -->
+    <path
+        android:fillColor="#FFE082"
+        android:pathData="M 83,32 L 84,34.5 L 86.5,34.5 L 84.5,36 L 85.5,38.5 L 83,37 L 80.5,38.5 L 81.5,36 L 79.5,34.5 L 82,34.5 Z" />
+
+    <path
+        android:fillColor="#FFE082"
+        android:pathData="M 23,31 L 23.5,32.2 M 22,32.2 H 24 M 23.5,33 L 23,34"
+        android:strokeColor="#FFE082"
+        android:strokeWidth="1.0"
+        android:strokeLineCap="round" />
+</vector>

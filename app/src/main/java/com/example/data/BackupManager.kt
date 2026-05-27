@@ -81,4 +81,45 @@ object BackupManager {
             null
         }
     }
+
+    /**
+     * Exports the books state into a CSV file and returns a share intent.
+     */
+    fun getShareBooksCsvIntent(context: Context, books: List<BookEntity>): Intent? {
+        return try {
+            val sb = java.lang.StringBuilder()
+            // CSV Header
+            sb.append("ID,Titulo,Autor,Genero,Ano,Quantidade Total,Quantidade Disponivel,Localizacao\n")
+            
+            books.forEach { book ->
+                // Basic sanitation for CSV
+                val title = book.title.replace(",", " ").replace("\"", "")
+                val author = book.author.replace(",", " ").replace("\"", "")
+                val genre = book.genre.replace(",", " ")
+                val location = book.location.replace(",", " ")
+                
+                sb.append("${book.id},\"${title}\",\"${author}\",\"${genre}\",${book.year},${book.totalQuantity},${book.availableQuantity},\"${location}\"\n")
+            }
+            
+            val file = File(context.cacheDir, "acervo_livros.csv")
+            file.writeText(sb.toString())
+
+            val uri: Uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/csv"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "Relatório do Acervo - Biblioteca Escolar")
+                putExtra(Intent.EXTRA_TEXT, "Segue em anexo o arquivo CSV contendo os dados do Acervo de Livros.")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
 }

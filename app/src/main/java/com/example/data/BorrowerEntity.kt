@@ -10,5 +10,6 @@ data class BorrowerEntity(
     val type: String, // "Aluno" or "Professor"
     val identifier: String, // Turma or Matrícula/Matéria depending on type
     val phone: String = "",
-    val classRoom: String = "" // Representing "Turma" (Class/Grade level)
+    val classRoom: String = "", // Representing "Turma" (Class/Grade level)
+    val blockedUntil: Long? = null // New field for block logic
 )

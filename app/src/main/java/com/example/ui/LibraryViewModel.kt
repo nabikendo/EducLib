@@ -58,6 +58,15 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
     val activeLoans: StateFlow<List<LoanEntity>> = repository.activeLoans
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val reservations: StateFlow<List<ReservationEntity>> = repository.allReservations
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val shelves: StateFlow<List<ShelfEntity>> = repository.allShelves
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val positions: StateFlow<List<ShelfPositionEntity>> = repository.allPositionsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         checkIfPasswordConfigured()
         // Save automatic backup whenever books or loans change
@@ -154,6 +163,14 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
                 phone = phone,
                 classRoom = classRoom
             )
+            repository.updateBorrower(updated)
+            triggerAutoBackup(context)
+        }
+    }
+
+    fun unblockBorrower(context: Context, borrower: BorrowerEntity) {
+        viewModelScope.launch {
+            val updated = borrower.copy(blockedUntil = null)
             repository.updateBorrower(updated)
             triggerAutoBackup(context)
         }
@@ -259,13 +276,53 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
         }
     }
 
-    fun returnBook(context: Context, loanId: Int, onResult: (Boolean) -> Unit) {
+    fun returnBook(context: Context, loanId: Int, returnedQuantity: Int = -1, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
-            val success = repository.returnLoan(loanId)
+            val success = repository.returnLoan(loanId, returnedQuantity)
             onResult(success)
             if (success) {
                 triggerAutoBackup(context)
             }
+        }
+    }
+
+    // --- Reservation Methods ---
+    fun createReservation(
+        context: Context,
+        bookId: Int,
+        borrowerName: String,
+        borrowerClass: String,
+        onResult: (Boolean) -> Unit
+    ) {
+        viewModelScope.launch {
+            val success = repository.createReservation(bookId, borrowerName, borrowerClass)
+            onResult(success)
+            if (success) {
+                triggerAutoBackup(context)
+            }
+        }
+    }
+
+    fun deleteReservation(context: Context, reservationId: Int) {
+        viewModelScope.launch {
+            repository.deleteReservationById(reservationId)
+            triggerAutoBackup(context)
+        }
+    }
+
+    fun promoteReservationToLoan(context: Context, reservation: ReservationEntity, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = repository.createLoan(
+                bookId = reservation.bookId,
+                borrowerName = reservation.borrowerName,
+                borrowerClass = reservation.borrowerClass,
+                quantity = 1
+            )
+            if (success) {
+                repository.deleteReservationById(reservation.id)
+                triggerAutoBackup(context)
+            }
+            onResult(success)
         }
     }
 
@@ -285,6 +342,10 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
 
     fun getShareBackupIntent(context: Context): Intent? {
         return BackupManager.getShareIntent(context, books.value, loans.value)
+    }
+
+    fun getShareBooksCsvIntent(context: Context): Intent? {
+        return BackupManager.getShareBooksCsvIntent(context, books.value)
     }
 
     fun restoreBackup(context: Context, jsonString: String, onResult: (Boolean) -> Unit) {
@@ -323,7 +384,7 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
                                 it.loanDate == loan.loanDate
                             }
                             if (inserted != null) {
-                                repository.returnLoan(inserted.id, loan.returnDate)
+                                repository.returnLoan(inserted.id, returnDate = loan.returnDate ?: System.currentTimeMillis())
                             }
                         }
                     }
@@ -335,6 +396,410 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
                 onResult(false)
             }
         }
+    }
+
+    fun importBooksFromCsv(context: Context, csvString: String, onResult: (Boolean, Int) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val lines = csvString.split('\n')
+                if (lines.isEmpty()) {
+                    onResult(false, 0)
+                    return@launch
+                }
+
+                val firstLine = lines.firstOrNull() ?: ""
+                val headers = parseCsvLine(firstLine).map { it.trim().lowercase() }
+
+                var titleIdx = headers.indexOfFirst { it.contains("titulo") || it.contains("título") || it == "title" }
+                var authorIdx = headers.indexOfFirst { it.contains("autor") || it == "author" }
+                var genreIdx = headers.indexOfFirst { it.contains("genero") || it.contains("gênero") || it == "genre" }
+                var yearIdx = headers.indexOfFirst { it.contains("ano") || it == "year" }
+                var quantityIdx = headers.indexOfFirst { it.contains("quantidade") || it.contains("qtd") || it.contains("quantity") || it == "total" || it.contains("total") }
+                var locationIdx = headers.indexOfFirst { it.contains("localizacao") || it.contains("localização") || it == "location" }
+
+                if (titleIdx == -1 && authorIdx == -1) {
+                    titleIdx = 0
+                    authorIdx = 1
+                    genreIdx = 2
+                    yearIdx = 3
+                    quantityIdx = 4
+                    locationIdx = 5
+                }
+
+                var importCount = 0
+                val startRow = if (headers.any { it.contains("titulo") || it.contains("título") || it == "title" || it == "autor" || it == "author" }) 1 else 0
+
+                for (i in startRow until lines.size) {
+                    val line = lines[i]
+                    if (line.isBlank()) continue
+                    val columns = parseCsvLine(line)
+                    if (columns.size <= maxOf(titleIdx, authorIdx)) continue
+
+                    val title = columns.getOrNull(titleIdx)?.trim()?.removeSurrounding("\"")?.ifBlank { null }
+                    val author = columns.getOrNull(authorIdx)?.trim()?.removeSurrounding("\"")?.ifBlank { null }
+
+                    if (title == null || author == null) continue
+
+                    val genre = if (genreIdx != -1) columns.getOrNull(genreIdx)?.trim()?.removeSurrounding("\"")?.ifBlank { "Outros" } ?: "Outros" else "Outros"
+                    val yearStr = if (yearIdx != -1) columns.getOrNull(yearIdx)?.trim()?.removeSurrounding("\"") else null
+                    val year = yearStr?.toIntOrNull() ?: java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+                    val qtyStr = if (quantityIdx != -1) columns.getOrNull(quantityIdx)?.trim()?.removeSurrounding("\"") else null
+                    val totalQty = qtyStr?.toIntOrNull() ?: 1
+                    val location = if (locationIdx != -1) columns.getOrNull(locationIdx)?.trim()?.removeSurrounding("\"")?.ifBlank { "Geral" } ?: "Geral" else "Geral"
+
+                    val book = com.example.data.BookEntity(
+                        title = title,
+                        author = author,
+                        genre = genre,
+                        year = year,
+                        location = location,
+                        photoPath = null,
+                        totalQuantity = totalQty,
+                        availableQuantity = totalQty
+                    )
+                    repository.insertBook(book)
+                    importCount++
+                }
+
+                if (importCount > 0) {
+                    triggerAutoBackup(context)
+                    onResult(true, importCount)
+                } else {
+                    onResult(false, 0)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                onResult(false, 0)
+            }
+        }
+    }
+
+    private fun parseCsvLine(line: String): List<String> {
+        val tokens = mutableListOf<String>()
+        var curVal = java.lang.StringBuilder()
+        var inQuotes = false
+        var i = 0
+        while (i < line.length) {
+            val ch = line[i]
+            if (inQuotes) {
+                if (ch == '\"') {
+                    if (i + 1 < line.length && line[i + 1] == '\"') {
+                        curVal.append('\"')
+                        i++
+                    } else {
+                        inQuotes = false
+                    }
+                } else {
+                    curVal.append(ch)
+                }
+            } else {
+                if (ch == '\"') {
+                    inQuotes = true
+                } else if (ch == ',' || ch == ';') {
+                    tokens.add(curVal.toString())
+                    curVal = java.lang.StringBuilder()
+                } else {
+                    curVal.append(ch)
+                }
+            }
+            i++
+        }
+        tokens.add(curVal.toString())
+        return tokens
+    }
+
+    // --- JTA & ROOF Custom Integrations & Algorithms ---
+
+    fun updateBookJtaMetadata(book: BookEntity, category: String, tipoObra: String, publicoAlvo: String) {
+        viewModelScope.launch {
+            val updated = book.copy(
+                category = category,
+                tipoObra = tipoObra,
+                publicoAlvo = publicoAlvo
+            )
+            repository.updateBook(updated)
+        }
+    }
+
+    fun updateBookCustomJustification(book: BookEntity, text: String) {
+        viewModelScope.launch {
+            val updated = book.copy(textoJustificativa = text)
+            repository.updateBook(updated)
+        }
+    }
+
+    fun associateBookToPosition(book: BookEntity, positionId: Int?) {
+        viewModelScope.launch {
+            val updated = book.copy(posicaoEstanteId = positionId)
+            repository.updateBook(updated)
+        }
+    }
+
+    // Shelf CRUD functions
+    fun addShelf(name: String) {
+        viewModelScope.launch {
+            if (name.isNotBlank()) {
+                repository.insertShelf(ShelfEntity(name = name))
+            }
+        }
+    }
+
+    fun deleteShelf(shelf: ShelfEntity) {
+        viewModelScope.launch {
+            repository.deleteShelf(shelf)
+        }
+    }
+
+    fun addPosition(shelfId: Int, coordinate: String, accessibilityLevel: Int) {
+        viewModelScope.launch {
+            if (coordinate.isNotBlank()) {
+                repository.insertPosition(
+                    ShelfPositionEntity(
+                        shelfId = shelfId,
+                        coordinate = coordinate,
+                        accessibilityLevel = accessibilityLevel
+                    )
+                )
+            }
+        }
+    }
+
+    fun deletePosition(position: ShelfPositionEntity) {
+        viewModelScope.launch {
+            repository.deletePosition(position)
+        }
+    }
+
+    // JTA Calculation Results Structure & Logic
+    data class JtaAnalysis(
+        val book: BookEntity,
+        val classification: String,
+        val justification: String,
+        val recommendation: String,
+        val level: String // "Crítica", "Média", "Baixa" or "Normal"
+    )
+
+    fun runJtaAnalysisForBooks(allBooksList: List<BookEntity>): List<JtaAnalysis> {
+        return allBooksList.map { book ->
+            val totalLoans = book.totalLoans
+            val lastLoan = book.lastLoanDate
+            
+            val daysSinceLastLoan = if (lastLoan != null) {
+                (System.currentTimeMillis() - lastLoan) / (1000L * 60 * 60 * 24)
+            } else {
+                365L // if never loaned, treat as 1 year
+            }
+            
+            // Criteria: Low circulation is defined as less than 3 loans or over 120 days since last borrow
+            val isLowCirculation = totalLoans < 3 || daysSinceLastLoan > 120
+            
+            if (!isLowCirculation) {
+                JtaAnalysis(
+                    book = book,
+                    classification = "Normal",
+                    justification = "O livro mantém fluxo saudável de circulação institucional. Mantém frequência de empréstimo satisfatória no acervo da biblioteca.",
+                    recommendation = "Manter monitoramento rotineiro regular.",
+                    level = "Normal"
+                )
+            } else {
+                val resolvedCategory = book.category.ifBlank { book.genre }
+                when {
+                    book.tipoObra.equals("Referência", ignoreCase = true) || 
+                    book.tipoObra.equals("Técnico", ignoreCase = true) || 
+                    book.genre.contains("Referência", ignoreCase = true) || 
+                    book.genre.contains("Bíblia", ignoreCase = true) || 
+                    book.genre.contains("Dicionário", ignoreCase = true) ||
+                    resolvedCategory.contains("Enciclopédia", ignoreCase = true) -> {
+                        JtaAnalysis(
+                            book = book,
+                            classification = "Baixa circulação estrutural",
+                            justification = "Obra técnica ou de consulta rápida direta no recinto da biblioteca. O perfil curricular determina baixa frequência de empréstimo externo (para domicílio), mas exibe alta relevância pedagógica estrutural interna na instituição de ensino ou acervo público. Justifica-se integralmente sua permanência física.",
+                            recommendation = "Manter no acervo permanente institucional. Estimular uso na própria sala de estudos através de dinâmicas didáticas coordenadas.",
+                            level = "Baixa"
+                        )
+                    }
+                    book.tipoObra.equals("Didático", ignoreCase = true) || 
+                    book.publicoAlvo.contains("Infantil", ignoreCase = true) ||
+                    book.publicoAlvo.contains("Juvenil", ignoreCase = true) -> {
+                        JtaAnalysis(
+                            book = book,
+                            classification = "Baixa circulação situacional",
+                            justification = "Material com perfil sazonal atrelado diretamente às dinâmicas letivas anuais. A circulação é altamente vinculada a bimestres escolares específicos, cronogramas de projetos escolares de leitura ou ementas específicas, registrando ociosidade temporária em certas épocas.",
+                            recommendation = "Manter no acervo como suporte estratégico de prontidão de conteúdo. Promover destaque focal no balcão de exibição no período letivo correspondente.",
+                            level = "Média"
+                        )
+                    }
+                    else -> {
+                        JtaAnalysis(
+                            book = book,
+                            classification = "Baixa circulação crítica",
+                            justification = "Tópico de ficção ou conteúdo geral ausente de saídas recentes por mais de $daysSinceLastLoan dias, acumulando pouca aderência de busca na estante física atual.",
+                            recommendation = "Reavaliar seu posicionamento físico utilizando a otimização ROOF, realizar exposições com curadoria de destaque temático quinzenal, ou em último caso encaminhar para triagem de descarte orientado.",
+                            level = "Alta"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Index of Defensibility (IDA)
+    fun calculateAssetDefensibilityIndex(allBooksList: List<BookEntity>): Int {
+        val analysis = runJtaAnalysisForBooks(allBooksList)
+        val lowCirculationBooks = analysis.filter { it.classification != "Normal" }
+        if (lowCirculationBooks.isEmpty()) return 100
+        
+        // Defended means either 'estrutural' or 'situacional' (since they are justified inherently)
+        // or has a custom text justification entered by the librarian.
+        val defendedBooks = lowCirculationBooks.count { 
+            it.classification == "Baixa circulação estrutural" || 
+            it.classification == "Baixa circulação situacional" || 
+            it.book.textoJustificativa?.isNotBlank() == true 
+        }
+        return (defendedBooks * 100) / lowCirculationBooks.size
+    }
+
+    // ROOF Optimization Suggestions Engine
+    data class RoofSuggestion(
+        val book: BookEntity,
+        val currentPosition: ShelfPositionEntity?,
+        val recommendedPosition: ShelfPositionEntity,
+        val reason: String
+    )
+
+    fun optimizeShelvesROOF(
+        shelfBooks: List<BookEntity>,
+        shelfPositions: List<ShelfPositionEntity>
+    ): List<RoofSuggestion> {
+        if (shelfBooks.isEmpty() || shelfPositions.isEmpty()) return emptyList()
+
+        // 1. Sort books by frequency of use descending
+        val sortedBooks = shelfBooks.sortedByDescending { it.useFrequency }
+
+        // 2. Sort available positions by accessibility descending (Level 3 = High, 2 = Medium, 1 = Low)
+        val sortedPositions = shelfPositions.sortedByDescending { it.accessibilityLevel }
+
+        // 3. Map ideal pairings
+        val suggestions = mutableListOf<RoofSuggestion>()
+        sortedBooks.forEachIndexed { index, book ->
+            val idealPos = sortedPositions.getOrNull(index % sortedPositions.size) ?: return@forEachIndexed
+            val currentPos = shelfPositions.find { it.id == book.posicaoEstanteId }
+
+            if (currentPos == null || currentPos.id != idealPos.id) {
+                // There is room for improvement!
+                val reason = when {
+                    book.useFrequency > 3 && idealPos.accessibilityLevel == 3 -> {
+                        "Livro '${book.title}' altamente demandado (freq: ${book.useFrequency}). Recomendamos mover para a posição '${idealPos.coordinate}' (Zona dos Olhos - Alta Acessibilidade) para agilizar as retiradas diárias."
+                    }
+                    book.useFrequency == 0 && idealPos.accessibilityLevel == 1 -> {
+                        "Livro '${book.title}' sem saídas registradas. Deve ser remanejado para a posição '${idealPos.coordinate}' (Zona Térrea/Superior - Baixa Acessibilidade), liberando espaço estratégico central."
+                    }
+                    else -> {
+                        "Ajustar livro '${book.title}' para a posição ideal '${idealPos.coordinate}' alinhando sua circulação física real à acessibilidade da prateleira correspondente."
+                    }
+                }
+
+                suggestions.add(
+                    RoofSuggestion(
+                        book = book,
+                        currentPosition = currentPos,
+                        recommendedPosition = idealPos,
+                        reason = reason
+                    )
+                )
+            }
+        }
+
+        return suggestions
+    }
+
+    // Calculate shelf efficiency index
+    fun calculateShelfEfficiencyIndex(
+        shelfBooks: List<BookEntity>,
+        shelfPositions: List<ShelfPositionEntity>
+    ): Int {
+        val assignedBooks = shelfBooks.filter { it.posicaoEstanteId != null }
+        if (assignedBooks.isEmpty()) return 100
+
+        // Sort all possible shelf books by frequency to establish quartiles/tiers
+        val sortedByFreq = shelfBooks.sortedBy { it.useFrequency }
+        val totalCount = sortedByFreq.size
+
+        var totalScore = 0
+        var evaluatedCount = 0
+
+        assignedBooks.forEach { book ->
+            val position = shelfPositions.find { it.id == book.posicaoEstanteId } ?: return@forEach
+            val rankPos = sortedByFreq.indexOfFirst { it.id == book.id }
+            val percentile = if (totalCount > 1) rankPos.toFloat() / (totalCount - 1) else 1f
+
+            val expectedAcess = when {
+                percentile >= 0.7f -> 3 // Very busy -> high access
+                percentile >= 0.3f -> 2 // Mid busy -> medium access
+                else -> 1 // Low busy -> low access
+            }
+
+            // Delta difference
+            val delta = kotlin.math.abs(expectedAcess - position.accessibilityLevel)
+            val score = when (delta) {
+                0 -> 100
+                1 -> 70
+                else -> 30
+            }
+            totalScore += score
+            evaluatedCount++
+        }
+
+        if (evaluatedCount == 0) return 100
+        return totalScore / evaluatedCount
+    }
+
+    // Generate formal audit text
+    fun generateJtaAuditReport(analysisList: List<JtaAnalysis>): String {
+        val sb = java.lang.StringBuilder()
+        val format = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+        val dateString = format.format(java.util.Date())
+
+        sb.append("========================================================================\n")
+        sb.append("       RELATÓRIO DE JUSTIFICATIVA TÉCNICA E AUDITORIA DO ACERVO JTA\n")
+        sb.append("   SISTEMA DE GESTÃO DE BIBLIOTECAS PÚBLICAS E ESCOLARES (OFFLINE)\n")
+        sb.append("   Gerado em: $dateString\n")
+        sb.append("========================================================================\n\n")
+
+        val lowCirc = analysisList.filter { it.classification != "Normal" }
+        sb.append("1. COMPOSIÇÃO DE DEFENSORIA DO ACERVO\n")
+        val defValue = if (lowCirc.isEmpty()) 100 else {
+            val defs = lowCirc.count { it.classification == "Baixa circulação estrutural" || it.classification == "Baixa circulação situacional" || it.book.textoJustificativa?.isNotBlank() == true }
+            (defs * 100) / lowCirc.size
+        }
+        sb.append("   - Índice de Defensabilidade do Acervo (IDA): $defValue%\n")
+        sb.append("   - Quantidade de livros mapeados com baixa circulação: ${lowCirc.size} de ${analysisList.size} livros totais\n\n")
+
+        sb.append("2. DETALHAMENTO DE OBRAS REGISTRADAS COMO BAIXA CIRCULAÇÃO:\n")
+        sb.append("------------------------------------------------------------------------\n")
+
+        lowCirc.forEachIndexed { i, entry ->
+            val book = entry.book
+            sb.append("${i + 1}. TÍTULO: ${book.title}\n")
+            sb.append("   AUTOR: ${book.author} | GÊNERO: ${book.genre}\n")
+            sb.append("   TIPO DE OBRA: ${book.tipoObra.uppercase()} | CATEGORIA: ${book.category.ifBlank { "Não Atribuída" }}\n")
+            sb.append("   PÚBLICO-ALVO: ${book.publicoAlvo}\n")
+            sb.append("   EMPRÉSTIMOS TOTAIS: ${book.totalLoans} | CLASSIFICAÇÃO: ${entry.classification.uppercase()}\n")
+            sb.append("   TID/GRAU CRITICIDADE: ${entry.level.uppercase()}\n")
+            sb.append("   JUSTIFICATIVA TÉCNICA AUTOMÁTICA OFICIAL JTA:\n")
+            sb.append("   \"${entry.justification}\"\n")
+            if (book.textoJustificativa?.isNotBlank() == true) {
+                sb.append("   ANOTAÇÕES COMPLEMENTARES DO BIBLIOTECÁRIO:\n")
+                sb.append("   \"${book.textoJustificativa}\"\n")
+            }
+            sb.append("   RECOMENDAÇÃO TÉCNICA DE MANUTENÇÃO:\n")
+            sb.append("   ${entry.recommendation}\n")
+            sb.append("------------------------------------------------------------------------\n\n")
+        }
+
+        sb.append("FIM DE RELATÓRIO OFICIAL DE AUDITORIA EXTERNA E LEI DO ACERVO\n")
+        sb.append("Assinatura do Bibliotecário Responsável: _______________________________\n")
+        return sb.toString()
     }
 
     // Provider Factory for ViewModel

@@ -8,6 +8,7 @@ data class BookEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val title: String,
     val author: String,
+    val isbn: String = "",
     val genre: String,
     val year: Int,
     val location: String,

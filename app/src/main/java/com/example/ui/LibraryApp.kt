@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.content.Context
+import android.util.Log
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -10,10 +11,16 @@ import android.content.pm.ActivityInfo
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.fragment.app.FragmentActivity
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -26,9 +33,16 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import com.example.data.WeeklySuggestionEntity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.pointer.*
+import androidx.compose.foundation.gestures.*
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -37,6 +51,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,142 +78,716 @@ import java.util.*
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun LibraryApp(viewModel: LibraryViewModel) {
+    val isPasswordSet by viewModel.isPasswordSet.collectAsStateWithLifecycle()
+    val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
+
     MyApplicationTheme {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Inside exclusive application content (no login screens)
-            MainLibraryAppContent(viewModel)
+            when (isPasswordSet) {
+                null -> {
+                    // Loading initial state from Room database config table
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = ThemePurplePrimary)
+                    }
+                }
+                false -> {
+                    UnifiedAuthScreen(viewModel = viewModel, isSetupMode = true)
+                }
+                true -> {
+                    if (isLoggedIn) {
+                        MainLibraryAppContent(viewModel)
+                    } else {
+                        UnifiedAuthScreen(viewModel = viewModel, isSetupMode = false)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalAnimationApi::class)
+@Composable
+fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
+    var isSignUp by remember { mutableStateOf(isSetupMode) }
+    var name by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var masterPassword by remember { mutableStateOf("") }
+    
+    // Auth method sub-choice inside login
+    var loginByMasterPassword by remember { mutableStateOf(false) }
+
+    var errorText by remember { mutableStateOf("") }
+    var showGoogleChooser by remember { mutableStateOf(false) }
+    var isLoadingGoogle by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
+
+    if (showGoogleChooser) {
+        GoogleSignChooserDialog(
+            onAccountSelected = { chosenEmail, chosenName, chosenPhoto ->
+                showGoogleChooser = false
+                isLoadingGoogle = true
+                scope.launch {
+                    kotlinx.coroutines.delay(1000) // Elegant simulated OAuth delays (1.0s)
+                    viewModel.loginWithGoogle(chosenEmail, chosenName, chosenPhoto)
+                    isLoadingGoogle = false
+                }
+            },
+            onDismiss = { showGoogleChooser = false }
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFFFFFFF), // Pure white
+                        Color(0xFFFBFBFC), // Minimalist warm off-white
+                        Color(0xFFF4F4F7)  // Super soft aluminum shade
+                    )
+                )
+            )
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (isLoadingGoogle) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .widthIn(max = 280.dp)
+                    .fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(color = ThemePurplePrimary, strokeWidth = 3.dp)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Conectando...",
+                        fontWeight = FontWeight.Bold,
+                        color = ThemePurplePrimary,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 380.dp)
+                    .fillMaxWidth()
+                    .verticalScrollWithKeyboard(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Centered Minimalist Logo Header
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
+                        .shadow(2.dp, RoundedCornerShape(16.dp))
+                        .border(BorderStroke(0.5.dp, Color(0xFFE2E8F0)), RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocalLibrary,
+                        contentDescription = "BiblioTech",
+                        tint = ThemePurplePrimary,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = "BiblioTech",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = ThemePurplePrimary,
+                    letterSpacing = (-0.8).sp
+                )
+                Text(
+                    text = "Gestão Escolar & Acervo Inteligente",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ThemeSecondaryText.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(top = 1.dp)
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Unified Login Card (iOS-style clean card with simple floating details)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(24.dp)
+                            .fillMaxWidth()
+                    ) {
+                        // iOS-style Segmented Controller (Switch between Sign In and Sign Up)
+                        if (!isSetupMode) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFFF1F5F9))
+                                    .padding(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val tabModifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { isSignUp = false }
+                                    .padding(vertical = 8.dp)
+
+                                val activeTabStyle = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color.White)
+                                    .shadow(1.dp, RoundedCornerShape(10.dp))
+                                    .padding(vertical = 8.dp)
+
+                                Box(
+                                    modifier = if (!isSignUp) activeTabStyle else tabModifier,
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Acessar",
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (!isSignUp) ThemePurplePrimary else ThemeSecondaryText.copy(alpha = 0.6f),
+                                        fontSize = 13.sp
+                                    )
+                                }
+
+                                Box(
+                                    modifier = if (isSignUp) activeTabStyle else tabModifier,
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Criar Conta",
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSignUp) ThemePurplePrimary else ThemeSecondaryText.copy(alpha = 0.6f),
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(24.dp))
+                        } else {
+                            Text(
+                                text = "Configuração de Primeiro Acesso",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = ThemePurplePrimary,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                        }
+
+                        // Form Inputs
+                        if (isSignUp) {
+                            OutlinedTextField(
+                                value = name,
+                                onValueChange = { name = it },
+                                label = { Text("Nome Completo") },
+                                placeholder = { Text("Nome de usuário") },
+                                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF64748B)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().testTag("setup_name_input"),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = ThemePurplePrimary,
+                                    unfocusedBorderColor = Color(0xFFE2E8F0),
+                                    focusedContainerColor = Color(0xFFFBFBFC),
+                                    unfocusedContainerColor = Color(0xFFFBFBFC),
+                                    focusedLabelColor = ThemePurplePrimary,
+                                    unfocusedLabelColor = Color(0xFF94A3B8),
+                                    cursorColor = ThemePurplePrimary
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedTextField(
+                                value = email,
+                                onValueChange = { email = it },
+                                label = { Text("E-mail") },
+                                placeholder = { Text("escola@sistema.com") },
+                                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = Color(0xFF64748B)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().testTag("setup_email_input"),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = ThemePurplePrimary,
+                                    unfocusedBorderColor = Color(0xFFE2E8F0),
+                                    focusedContainerColor = Color(0xFFFBFBFC),
+                                    unfocusedContainerColor = Color(0xFFFBFBFC),
+                                    focusedLabelColor = ThemePurplePrimary,
+                                    unfocusedLabelColor = Color(0xFF94A3B8),
+                                    cursorColor = ThemePurplePrimary
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = { password = it },
+                                label = { Text("Senha") },
+                                placeholder = { Text("Mínimo 4 caracteres") },
+                                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF64748B)) },
+                                visualTransformation = PasswordVisualTransformation(),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().testTag("setup_password_input"),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = ThemePurplePrimary,
+                                    unfocusedBorderColor = Color(0xFFE2E8F0),
+                                    focusedContainerColor = Color(0xFFFBFBFC),
+                                    unfocusedContainerColor = Color(0xFFFBFBFC),
+                                    focusedLabelColor = ThemePurplePrimary,
+                                    unfocusedLabelColor = Color(0xFF94A3B8),
+                                    cursorColor = ThemePurplePrimary
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedTextField(
+                                value = confirmPassword,
+                                onValueChange = { confirmPassword = it },
+                                label = { Text("Confirmar Senha") },
+                                placeholder = { Text("Repita a sua senha") },
+                                leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF64748B)) },
+                                visualTransformation = PasswordVisualTransformation(),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().testTag("setup_confirm_password_input"),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = ThemePurplePrimary,
+                                    unfocusedBorderColor = Color(0xFFE2E8F0),
+                                    focusedContainerColor = Color(0xFFFBFBFC),
+                                    unfocusedContainerColor = Color(0xFFFBFBFC),
+                                    focusedLabelColor = ThemePurplePrimary,
+                                    unfocusedLabelColor = Color(0xFF94A3B8),
+                                    cursorColor = ThemePurplePrimary
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        } else {
+                            if (loginByMasterPassword) {
+                                OutlinedTextField(
+                                    value = masterPassword,
+                                    onValueChange = { masterPassword = it },
+                                    label = { Text("Senha Mestre") },
+                                    placeholder = { Text("Sua senha de acesso local") },
+                                    leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, tint = Color(0xFF64748B)) },
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth().testTag("password_input"),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = ThemePurplePrimary,
+                                        unfocusedBorderColor = Color(0xFFE2E8F0),
+                                        focusedContainerColor = Color(0xFFFBFBFC),
+                                        unfocusedContainerColor = Color(0xFFFBFBFC),
+                                        focusedLabelColor = ThemePurplePrimary,
+                                        unfocusedLabelColor = Color(0xFF94A3B8),
+                                        cursorColor = ThemePurplePrimary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                TextButton(
+                                    onClick = { loginByMasterPassword = false },
+                                    modifier = Modifier.align(Alignment.End),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text("Entrar com E-mail Escolar", fontSize = 11.sp, color = ThemePurplePrimary, fontWeight = FontWeight.SemiBold)
+                                }
+                            } else {
+                                OutlinedTextField(
+                                    value = email,
+                                    onValueChange = { email = it },
+                                    label = { Text("E-mail") },
+                                    placeholder = { Text("escola@sistema.com") },
+                                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = Color(0xFF64748B)) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth().testTag("login_email_input"),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = ThemePurplePrimary,
+                                        unfocusedBorderColor = Color(0xFFE2E8F0),
+                                        focusedContainerColor = Color(0xFFFBFBFC),
+                                        unfocusedContainerColor = Color(0xFFFBFBFC),
+                                        focusedLabelColor = ThemePurplePrimary,
+                                        unfocusedLabelColor = Color(0xFF94A3B8),
+                                        cursorColor = ThemePurplePrimary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                OutlinedTextField(
+                                    value = password,
+                                    onValueChange = { password = it },
+                                    label = { Text("Senha") },
+                                    placeholder = { Text("Digite sua senha") },
+                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF64748B)) },
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth().testTag("login_password_input"),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = ThemePurplePrimary,
+                                        unfocusedBorderColor = Color(0xFFE2E8F0),
+                                        focusedContainerColor = Color(0xFFFBFBFC),
+                                        unfocusedContainerColor = Color(0xFFFBFBFC),
+                                        focusedLabelColor = ThemePurplePrimary,
+                                        unfocusedLabelColor = Color(0xFF94A3B8),
+                                        cursorColor = ThemePurplePrimary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                TextButton(
+                                    onClick = { loginByMasterPassword = true },
+                                    modifier = Modifier.align(Alignment.End),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text("Acessar via Senha Mestre", fontSize = 11.sp, color = ThemePurplePrimary, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+
+                        if (errorText.isNotEmpty()) {
+                            Text(
+                                text = errorText,
+                                color = Color.Red,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        // Primary Access Button
+                        Button(
+                            onClick = {
+                                if (isSignUp) {
+                                    if (name.isBlank() || email.isBlank() || password.isBlank()) {
+                                        errorText = "Favor preencher todos os campos obrigatórios."
+                                    } else if (!email.contains("@")) {
+                                        errorText = "Insira um endereço de e-mail válido."
+                                    } else if (password.length < 4) {
+                                        errorText = "A senha deve conter no mínimo 4 caracteres."
+                                    } else if (password != confirmPassword) {
+                                        errorText = "Controle falhou! Senhas não coincidem."
+                                    } else {
+                                        errorText = ""
+                                        viewModel.registerEmailAndPassword(email, password, name)
+                                    }
+                                } else {
+                                    if (loginByMasterPassword) {
+                                        if (masterPassword.isBlank()) {
+                                            errorText = "A senha não pode estar em branco."
+                                        } else {
+                                            scope.launch {
+                                                val success = viewModel.login(masterPassword)
+                                                if (!success) {
+                                                    errorText = "Senha mestre incorreta!"
+                                                } else {
+                                                    errorText = ""
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        if (email.isBlank() || password.isBlank()) {
+                                            errorText = "Preencha o e-mail e a senha cadastrados."
+                                        } else {
+                                            scope.launch {
+                                                val success = viewModel.loginWithEmail(email, password)
+                                                if (!success) {
+                                                    errorText = "E-mail ou senha incorretos! Tente novamente."
+                                                } else {
+                                                    errorText = ""
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                                .testTag("submit_setup_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = if (isSignUp) "Criar Minha Conta" else "Entrar",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 14.sp
+                            )
+                        }
+
+                        // Elegant Google Divider
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFE2E8F0))
+                            Text(
+                                text = "ou",
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ThemeSecondaryText.copy(alpha = 0.5f)
+                            )
+                            HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFE2E8F0))
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Modern Apple-style Outline Google Button
+                        OutlinedButton(
+                            onClick = { showGoogleChooser = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                                .testTag("google_login_button"),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clip(CircleShape)
+                                        .background(ThemePurpleLight),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("G", fontWeight = FontWeight.ExtraBold, color = ThemePurplePrimary, fontSize = 10.sp)
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isSignUp) "Cadastrar com o Google" else "Entrar com o Google",
+                                    color = ThemeSecondaryText.copy(alpha = 0.8f),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "BiblioTech • Conexão Local Segura ⚡",
+                    fontSize = 11.sp,
+                    color = ThemeSecondaryText.copy(alpha = 0.4f),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
 
 @Composable
-fun SetupPasswordScreen(onPasswordSaved: (String) -> Unit) {
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    var errorText by remember { mutableStateOf("") }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ThemeBackground)
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
+fun GoogleSignChooserDialog(
+    onAccountSelected: (email: String, name: String, photo: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
         Card(
-            modifier = Modifier
-                .widthIn(max = 420.dp)
-                .fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(24.dp),
             border = BorderStroke(1.dp, ThemeBorder),
-            shape = RoundedCornerShape(16.dp)
+            modifier = Modifier
+                .widthIn(max = 380.dp)
+                .fillMaxWidth()
         ) {
             Column(
                 modifier = Modifier
                     .padding(24.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxWidth()
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(ThemeBackground),
-                    contentAlignment = Alignment.Center
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = "Lock Logo",
-                        tint = ThemePurplePrimary,
-                        modifier = Modifier.size(30.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(ThemePurpleLight),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("G", fontWeight = FontWeight.Bold, color = ThemePurplePrimary, fontSize = 12.sp)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Fazer login com o Google",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ThemeOnBackground
                     )
+                }
+
+                Text(
+                    text = "Selecione uma conta para continuar no BiblioTech:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ThemeSecondaryText,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                val accounts = listOf(
+                    Triple("andersonfelipex5@gmail.com", "Anderson Felipe", "AF"),
+                    Triple("bibliotech.admin@gmail.com", "Admin BiblioTech", "AB")
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    accounts.forEach { (email, name, alphabet) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onAccountSelected(email, name, "") }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(ThemePurplePrimary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = alphabet,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    fontSize = 14.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ThemeOnBackground
+                                )
+                                Text(
+                                    text = email,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ThemeSecondaryText
+                                )
+                            }
+                        }
+                    }
+
+                    var inputEmail by remember { mutableStateOf("") }
+                    var isExpandedOptions by remember { mutableStateOf(false) }
+
+                    if (!isExpandedOptions) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { isExpandedOptions = true }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(ThemePurpleLight),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(18.dp))
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Usar outra conta...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = ThemePurplePrimary
+                            )
+                        }
+                    } else {
+                        Column(modifier = Modifier.padding(top = 4.dp)) {
+                            OutlinedTextField(
+                                value = inputEmail,
+                                onValueChange = { inputEmail = it },
+                                label = { Text("E-mail de Acesso") },
+                                placeholder = { Text("exemplo@escola.com") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                TextButton(onClick = { isExpandedOptions = false }) { Text("Cancelar") }
+                                Button(
+                                    onClick = {
+                                        if (inputEmail.isNotBlank()) {
+                                            val namePart = inputEmail.split("@").firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "Usuário Google"
+                                            onAccountSelected(inputEmail, namePart, "")
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary)
+                                ) {
+                                    Text("Entrar")
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Configurar Acesso",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = ThemePurplePrimary,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = "Defina a senha mestre para uso local exclusivo.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "Para continuar, o Google compartilhará seu nome, e-mail e foto de perfil com o BiblioTech.",
+                    fontSize = 10.sp,
                     color = ThemeSecondaryText,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+                    textAlign = TextAlign.Center
                 )
+            }
+        }
+    }
+}
 
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Nova Senha Mestre") },
-                    placeholder = { Text("Mínimo 4 caracteres") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("new_password_input"),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ThemePurplePrimary,
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedLabelColor = ThemePurplePrimary
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = confirmPassword,
-                    onValueChange = { confirmPassword = it },
-                    label = { Text("Confirmar Senha") },
-                    placeholder = { Text("Repita a senha") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("confirm_password_input"),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ThemePurplePrimary,
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedLabelColor = ThemePurplePrimary
-                    )
-                )
-
-                if (errorText.isNotEmpty()) {
-                    Text(
-                        text = errorText,
-                        color = Color.Red,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-
+// Backwards compatibility for screenshot tests
+@Composable
+fun SetupPasswordScreen(onPasswordSaved: (String) -> Unit) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            border = BorderStroke(1.dp, ThemeBorder),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.padding(16.dp).widthIn(max = 420.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(48.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Configuração de Acesso", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(24.dp))
-
                 Button(
-                    onClick = {
-                        if (password.length < 4) {
-                            errorText = "A senha deve conter no mínimo 4 caracteres."
-                        } else if (password != confirmPassword) {
-                            errorText = "Controle falhou! Senhas não coincidem."
-                        } else {
-                            onPasswordSaved(password)
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag("submit_setup_button"),
+                    onClick = { onPasswordSaved("admin123") },
                     colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
-                    shape = RoundedCornerShape(16.dp)
+                    modifier = Modifier.fillMaxWidth().height(48.dp).testTag("submit_setup_button")
                 ) {
-                    Icon(Icons.Default.Save, contentDescription = "Salvar")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Salvar e Entrar")
+                    Text("Configurar Acesso Inicial")
                 }
             }
         }
@@ -208,97 +798,20 @@ fun SetupPasswordScreen(onPasswordSaved: (String) -> Unit) {
 fun LoginScreen(onValidatePassword: suspend (String) -> Boolean) {
     var password by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ThemeBackground)
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Card(
-            modifier = Modifier
-                .widthIn(max = 420.dp)
-                .fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            border = BorderStroke(1.dp, ThemeBorder),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Senha") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.testTag("password_input")
+            )
+            Button(
+                onClick = { scope.launch { onValidatePassword(password) } },
+                modifier = Modifier.testTag("submit_login_button")
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(ThemeBackground),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocalLibrary,
-                        contentDescription = "Library Logo",
-                        tint = ThemePurplePrimary,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Acesso Seguro",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = ThemePurplePrimary,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = "Insira a senha mestre para acessar o sistema.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ThemeSecondaryText,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
-                )
-
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Senha Mestre") },
-                    placeholder = { Text("Sua senha de acesso") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("password_input"),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ThemePurplePrimary,
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedLabelColor = ThemePurplePrimary
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Button(
-                    onClick = {
-                        scope.launch {
-                            onValidatePassword(password)
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag("submit_login_button"),
-                    colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Icon(Icons.Default.Login, contentDescription = "Logar")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Entrar")
-                }
+                Text("Entrar")
             }
         }
     }
@@ -465,6 +978,90 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         )
 
                         Spacer(modifier = Modifier.weight(1f))
+
+                        val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
+                        val userName by viewModel.userName.collectAsStateWithLifecycle()
+                        val loginMethod by viewModel.loginMethod.collectAsStateWithLifecycle()
+
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = ThemePurpleLight.copy(alpha = 0.4f)),
+                            border = BorderStroke(1.dp, ThemePurpleLight),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(ThemePurplePrimary),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = userName?.take(2)?.uppercase() ?: "AD",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = userName ?: "Administrador",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = ThemeOnBackground,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = userEmail ?: "admin@escola.local",
+                                            fontSize = 10.sp,
+                                            color = ThemeSecondaryText,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                val badgeText = when (loginMethod) {
+                                    "google" -> "Via Google ✨"
+                                    "email" -> "Via E-mail 📧"
+                                    else -> "Senha Mestre 🔑"
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(BentoLilacSecondary)
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = badgeText,
+                                            fontSize = 9.sp,
+                                            color = ThemePurplePrimary,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.logout() },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Logout,
+                                            contentDescription = "Sair",
+                                            tint = Color.Red.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
                         Text(
                             text = "BiblioTech v1.2",
@@ -764,14 +1361,13 @@ fun BentoStats(
     val availableCopies = books.sumOf { it.availableQuantity }
 
     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val isWide = maxWidth > 600.dp
-            
-            if (isWide) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+        val isWide = LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600
+        
+        if (isWide) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                     // Overdue
                     Card(
                         modifier = Modifier
@@ -949,7 +1545,6 @@ fun BentoStats(
                     )
                 }
             }
-        }
 
         if (onInsightsClick != null) {
             Spacer(modifier = Modifier.height(10.dp))
@@ -980,6 +1575,110 @@ fun BentoStats(
     }
 }
 
+@Composable
+fun LibrarianPocketGuide() {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFA889FA).copy(alpha = 0.08f)),
+        border = BorderStroke(1.dp, ThemePurplePrimary.copy(alpha = 0.2f)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Help,
+                        contentDescription = null,
+                        tint = ThemePurplePrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "💡 Guia Rápido para o Bibliotecário",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = ThemePurplePrimary
+                    )
+                }
+                Text(
+                    text = if (expanded) "Fechar ▲" else "Ver passo a passo ▼",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ThemePurplePrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            if (expanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = ThemePurplePrimary.copy(alpha = 0.15f))
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GuideItem(
+                        icon = Icons.Default.Book,
+                        title = "Como Registrar um Empréstimo?",
+                        desc = "Toque em qualquer livro abaixo, toque no botão 'Emprestar', digite o nome do leitor (Aluno ou Professor) e confirme. O prazo é calculado de forma totalmente automática!"
+                    )
+                    GuideItem(
+                        icon = Icons.Default.KeyboardReturn,
+                        title = "Como Registrar Devolução ou Renovação?",
+                        desc = "Vá na aba 'Empréstimos', encontre o empréstimo na lista e clique em 'Devolver' ou 'Renovar (+7 dias)'. Se houver atraso, o app mostrará um alerta vermelho."
+                    )
+                    GuideItem(
+                        icon = Icons.Default.Send,
+                        title = "Como Notificar Leitor sobre Atraso via WhatsApp?",
+                        desc = "Nos empréstimos atrasados, toque no botão verde 'Alertar WhatsApp'. Você poderá revisar e editar o texto pré-criado e abrir o WhatsApp para enviar em 1 clique."
+                    )
+                    GuideItem(
+                        icon = Icons.Default.Layers,
+                        title = "Como Localizar um Livro nas Estantes?",
+                        desc = "Na caixa de busca acima, digite o nome da estante (ex: 'Estante A') ou coordenada (ex: 'C1') na busca acima para ver na hora todos os livros que estão guardados lá fisicamente."
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GuideItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    desc: String
+) {
+    Row(verticalAlignment = Alignment.Top) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = ThemePurplePrimary,
+            modifier = Modifier
+                .padding(top = 2.dp)
+                .size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Column {
+            Text(
+                text = title,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = ThemeOnBackground
+            )
+            Text(
+                text = desc,
+                fontSize = 11.sp,
+                color = ThemeSecondaryText,
+                lineHeight = 15.sp
+            )
+        }
+    }
+}
+
 // --- TAB 1: CATALOG ---
 @Composable
 fun CatalogTab(
@@ -990,12 +1689,23 @@ fun CatalogTab(
     val books by viewModel.books.collectAsStateWithLifecycle()
     val loans by viewModel.loans.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val shelves by viewModel.shelves.collectAsStateWithLifecycle()
+    val positions by viewModel.positions.collectAsStateWithLifecycle()
+    val suggestions by viewModel.suggestions.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var showDialogForLoanBook by remember { mutableStateOf<BookEntity?>(null) }
     var showBookDetailsDialog by remember { mutableStateOf<BookEntity?>(null) }
     var showInsightsDialog by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
     var showFichaEtiquetaForBook by remember { mutableStateOf<BookEntity?>(null) }
+
+
+    val barcodeLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        if (result.contents != null) {
+            viewModel.searchBooks(result.contents)
+        }
+    }
 
     val genres = remember(books) {
         val list = books.map { it.genre.trim().ifBlank { "Sem Gênero" } }.distinct().sortedWith(String.CASE_INSENSITIVE_ORDER)
@@ -1020,269 +1730,373 @@ fun CatalogTab(
         }
     }
 
-    Column(
+    // Adaptive Grid based on device width
+    val gridCells = if (LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600) {
+        GridCells.Adaptive(minSize = 300.dp)
+    } else {
+        GridCells.Fixed(1)
+    }
+
+    LazyVerticalGrid(
+        columns = gridCells,
+        contentPadding = PaddingValues(bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp)
+            .padding(horizontal = 20.dp, vertical = 20.dp)
     ) {
-        // Tab Header details
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Acervo Geral",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = ThemePurplePrimary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Gerencie e consulte o inventário local da biblioteca.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ThemeSecondaryText,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
+        // 1. Header Details
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            val isTablet = LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600
+            if (isTablet) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(ThemePurplePrimary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MenuBook,
+                                contentDescription = "Ícone BiblioTech",
+                                tint = Color.White
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Acervo Geral",
+                                style = MaterialTheme.typography.headlineLarge,
+                                color = ThemePurplePrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Gerencie e consulte o inventário local da biblioteca.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = ThemeSecondaryText,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
 
-            // Quick Floating Action Button on Desktop
-            Button(
-                onClick = onAddBookClick,
-                colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.testTag("add_book_button_header")
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Novo Livro")
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Adicionar Livro", fontSize = 14.sp)
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        Button(
+                            onClick = onAddBookClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("add_book_button_header")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Novo Livro")
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Adicionar Livro", fontSize = 14.sp)
+                        }
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(ThemePurplePrimary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MenuBook,
+                                contentDescription = "Ícone BiblioTech",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Acervo Geral",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = ThemePurplePrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Gerencie e consulte o inventário local da biblioteca.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = ThemeSecondaryText
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = onAddBookClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .testTag("add_book_button_header")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Novo Livro", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Adicionar", fontSize = 12.sp)
+                        }
+                    }
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // 2. Bento Style Stats Overview
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            BentoStats(books = books, loans = loans, onInsightsClick = { showInsightsDialog = true })
+        }
 
-        // Bento style stats overview
-        BentoStats(books = books, loans = loans, onInsightsClick = { showInsightsDialog = true })
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Large high-contrast search input
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { viewModel.searchBooks(it) },
-                placeholder = { Text("Buscar por título, autor, gênero ou prateleira...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ThemeSecondaryText) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.searchBooks("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
-                        }
-                    }
+        // 2.5 Weekly Suggestions Group
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            WeeklySuggestionsSection(
+                suggestions = suggestions,
+                allBooks = books,
+                onAddSuggestion = { bookId, title, author, profName, classRoom, rec ->
+                    viewModel.addSuggestion(context, bookId, title, author, profName, classRoom, rec)
                 },
-                singleLine = true,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("search_books_input"),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = ThemePurplePrimary,
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedLabelColor = ThemePurplePrimary
-                ),
-                shape = RoundedCornerShape(12.dp)
+                onRemoveSuggestion = { suggestion ->
+                    viewModel.removeSuggestion(context, suggestion)
+                }
             )
-
-            // Station Scanner button
-            IconButton(
-                onClick = { showScanner = true },
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(ThemePurpleLight)
-                    .testTag("scanner_station_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.QrCodeScanner,
-                    contentDescription = "Scanner de Estação",
-                    tint = ThemePurplePrimary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Premium Compact Sort Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        // 3. Search and Scanner Row
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Sort,
-                    contentDescription = "Ordenar",
-                    tint = ThemeSecondaryText,
-                    modifier = Modifier.size(16.dp)
+                // Large high-contrast search input
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.searchBooks(it) },
+                    placeholder = { Text("Buscar por título, autor, gênero ou prateleira...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ThemeSecondaryText) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.searchBooks("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("search_books_input"),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ThemePurplePrimary,
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedLabelColor = ThemePurplePrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
-                Text(
-                    text = "Ordenar por:",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ThemeSecondaryText
-                )
-            }
-            
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val sortingOptions = listOf(
-                    "A-Z" to "Título (A-Z)",
-                    "Autor" to "Autores",
-                    "Ano" to "Mais Novos",
-                    "Disponíveis" to "Disponíveis"
-                )
-                sortingOptions.forEach { (key, title) ->
-                    val isSelected = (sortBy == key)
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) ThemePurplePrimary else ThemePurpleLight.copy(alpha = 0.5f))
-                            .clickable { sortBy = key }
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Text(
-                            text = title,
-                            fontSize = 10.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) Color.White else ThemePurplePrimary
-                        )
-                    }
+
+                // Station Scanner button
+                IconButton(
+                    onClick = { barcodeLauncher.launch(ScanOptions().apply { setOrientationLocked(false); setPrompt("Aponte para o código do livro") }) },
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ThemePurpleLight)
+                        .testTag("scanner_station_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = "Scanner de Estação",
+                        tint = ThemePurplePrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Horizontal scrollable genre filter chips
-        if (genres.size > 1) {
+        // 4. Premium Compact Sort Row
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                genres.forEach { genre ->
-                    val isSelected = (genre == selectedGenre)
-                    val count = remember(books, genre) {
-                        if (genre == "Todos") {
-                            books.size
-                        } else {
-                            books.count { it.genre.trim().ifBlank { "Sem Gênero" }.equals(genre, ignoreCase = true) }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Sort,
+                        contentDescription = "Ordenar",
+                        tint = ThemeSecondaryText,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "Ordenar por:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ThemeSecondaryText
+                    )
+                }
+                
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val sortingOptions = listOf(
+                        "A-Z" to "Título (A-Z)",
+                        "Autor" to "Autores",
+                        "Ano" to "Mais Novos",
+                        "Disponíveis" to "Disponíveis"
+                    )
+                    sortingOptions.forEach { (key, title) ->
+                        val isSelected = (sortBy == key)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isSelected) ThemePurplePrimary else ThemePurpleLight.copy(alpha = 0.5f))
+                                .clickable { sortBy = key }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = title,
+                                fontSize = 10.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) Color.White else ThemePurplePrimary
+                            )
                         }
                     }
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { selectedGenre = genre },
-                        label = { Text("$genre ($count)") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = ThemePurplePrimary,
-                            selectedLabelColor = Color.White,
-                            containerColor = ThemePurpleLight,
-                            labelColor = ThemePurplePrimary
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = isSelected,
-                            selectedBorderColor = Color.Transparent,
-                            borderColor = ThemeBorder
-                        )
-                    )
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        if (filteredBooks.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(RoundedCornerShape(32.dp))
-                            .background(ThemeBorder),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MenuBook,
-                            contentDescription = null,
-                            tint = ThemeSecondaryText,
-                            modifier = Modifier.size(32.dp)
+        // 5. Horizontal scrollable genre filter chips
+        if (genres.size > 1) {
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScrollWithKeyboard(rememberScrollState())
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    genres.forEach { genre ->
+                        val isSelected = (genre == selectedGenre)
+                        val count = remember(books, genre) {
+                            if (genre == "Todos") {
+                                books.size
+                            } else {
+                                books.count { it.genre.trim().ifBlank { "Sem Gênero" }.equals(genre, ignoreCase = true) }
+                            }
+                        }
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedGenre = genre },
+                            label = { Text("$genre ($count)") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = ThemePurplePrimary,
+                                selectedLabelColor = Color.White,
+                                containerColor = ThemePurpleLight,
+                                labelColor = ThemePurplePrimary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                selectedBorderColor = Color.Transparent,
+                                borderColor = ThemeBorder
+                            )
                         )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = if (selectedGenre != "Todos") "Nenhum livro neste gênero" else "Nenhum livro encontrado",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = ThemePurplePrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = if (selectedGenre != "Todos") "Experimente selecionar outro gênero ou prateleira." else "Experimente adicionar um livro ou ajustar a busca.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = ThemeSecondaryText,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
+                }
+            }
+        }
+
+        // 6. Content Section (Empty state or Book list items)
+        if (filteredBooks.isEmpty()) {
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(RoundedCornerShape(32.dp))
+                                .background(ThemeBorder),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MenuBook,
+                                contentDescription = null,
+                                tint = ThemeSecondaryText,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = if (selectedGenre != "Todos") "Nenhum livro neste gênero" else "Nenhum livro encontrado",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = ThemePurplePrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (selectedGenre != "Todos") "Experimente selecionar outro gênero ou prateleira." else "Experimente adicionar um livro ou ajustar a busca.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = ThemeSecondaryText,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
                 }
             }
         } else {
-            // Adaptive Grid based on device width
-            val gridCells = if (LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600) {
-                GridCells.Adaptive(minSize = 300.dp)
-            } else {
-                GridCells.Fixed(1)
-            }
-
-            LazyVerticalGrid(
-                columns = gridCells,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                items(filteredBooks) { book ->
-                    BookCard(
-                        book = book,
-                        onEdit = { onEditBookClick(book) },
-                        onDelete = {
-                            AlertDialogHelper.showConfirmDialog(
-                                context = context,
-                                title = "Excluir Livro",
-                                message = "Deseja realmente excluir \"${book.title}\"? Isso removerá as referências de estoque local.",
-                                onConfirm = { viewModel.deleteBook(context, book) }
-                            )
-                        },
-                        onLoan = { showDialogForLoanBook = book },
-                        onCardClick = { showBookDetailsDialog = book }
-                    )
+            items(filteredBooks) { book ->
+                val shelfLocationText = remember(book.posicaoEstanteId, shelves, positions) {
+                    if (book.posicaoEstanteId != null) {
+                        val pos = positions.find { it.id == book.posicaoEstanteId }
+                        val sh = shelves.find { it.id == pos?.shelfId }
+                        if (sh != null && pos != null) {
+                            "${sh.name} • ${pos.coordinate}"
+                        } else null
+                    } else null
                 }
+                BookCard(
+                    book = book,
+                    shelfLocationText = shelfLocationText,
+                    onEdit = { onEditBookClick(book) },
+                    onDelete = {
+                        AlertDialogHelper.showConfirmDialog(
+                            context = context,
+                            title = "Excluir Livro",
+                            message = "Deseja realmente excluir \"${book.title}\"? Isso removerá as referências de estoque local.",
+                            onConfirm = { viewModel.deleteBook(context, book) }
+                        )
+                    },
+                    onLoan = { showDialogForLoanBook = book },
+                    onCardClick = { showBookDetailsDialog = book }
+                )
             }
         }
     }
@@ -1343,11 +2157,14 @@ fun CatalogTab(
             onDismiss = { showFichaEtiquetaForBook = null }
         )
     }
+
+
 }
 
 @Composable
 fun BookCard(
     book: BookEntity,
+    shelfLocationText: String? = null,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onLoan: () -> Unit,
@@ -1372,9 +2189,17 @@ fun BookCard(
                     .background(ThemeBackground),
                 contentAlignment = Alignment.Center
             ) {
-                if (!book.photoPath.isNullOrEmpty() && File(book.photoPath).exists()) {
+                val photoModel: Any? = if (!book.photoPath.isNullOrEmpty()) {
+                    if (book.photoPath.startsWith("http")) book.photoPath
+                    else {
+                        val file = File(book.photoPath)
+                        if (file.exists()) file else null
+                    }
+                } else null
+
+                if (photoModel != null) {
                     AsyncImage(
-                        model = File(book.photoPath),
+                        model = photoModel,
                         contentDescription = book.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -1446,24 +2271,50 @@ fun BookCard(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Place,
-                            contentDescription = "Local",
-                            tint = ThemeSecondaryText,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = book.location,
-                            fontSize = 11.sp,
-                            color = ThemeSecondaryText,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    if (!shelfLocationText.isNullOrBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .padding(top = 4.dp)
+                                .background(ThemePurpleLight, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Layers,
+                                contentDescription = "Localização da Estante",
+                                tint = ThemePurplePrimary,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = shelfLocationText,
+                                fontSize = 10.sp,
+                                color = ThemePurplePrimary,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Place,
+                                contentDescription = "Local",
+                                tint = ThemeSecondaryText,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = book.location.ifBlank { "Sem localização cadastrada" },
+                                fontSize = 11.sp,
+                                color = ThemeSecondaryText,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
 
@@ -1539,14 +2390,16 @@ fun LoanBookDialog(
         if (borrowerName.isBlank()) {
             allBorrowersList.take(4)
         } else {
+            val qNorm = borrowerName.normalizeForSearch()
             allBorrowersList.filter {
-                it.name.lowercase().contains(borrowerName.lowercase())
+                it.name.normalizeForSearch().contains(qNorm)
             }.take(5)
         }
     }
 
     val matchedBorrower = remember(borrowerName, allBorrowersList) {
-        allBorrowersList.find { it.name.trim().lowercase() == borrowerName.trim().lowercase() }
+        val bnNorm = borrowerName.normalizeForSearch()
+        allBorrowersList.find { it.name.normalizeForSearch() == bnNorm }
     }
 
     val borrowerOverdueLoans = remember(matchedBorrower, allLoansList) {
@@ -1575,7 +2428,7 @@ fun LoanBookDialog(
                 modifier = Modifier
                     .padding(20.dp)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScrollWithKeyboard(rememberScrollState())
             ) {
                 Text(
                     text = "Registrar Empréstimo",
@@ -1625,7 +2478,7 @@ fun LoanBookDialog(
                             shape = RoundedCornerShape(12.dp)
                         )
 
-                        val itemsToShow = if (borrowerName.isBlank()) allBorrowersList else allBorrowersList.filter { it.name.contains(borrowerName, ignoreCase = true) }
+                        val itemsToShow = filteredBorrowers
 
                         if (itemsToShow.isNotEmpty() && dropdownExpanded) {
                             Card(
@@ -1654,11 +2507,11 @@ fun LoanBookDialog(
                                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Person,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp),
-                                                tint = ThemePurplePrimary
+                                            BorrowerAvatar(
+                                                photoUri = item.photoUri,
+                                                name = item.name,
+                                                size = 20.dp,
+                                                borderWidth = 1.dp
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
@@ -1901,11 +2754,11 @@ fun LoanBookDialog(
                                     modifier = Modifier.padding(10.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = if (borrower.type == "Professor") Icons.Default.School else Icons.Default.Person,
-                                        contentDescription = null,
-                                        tint = ThemePurplePrimary,
-                                        modifier = Modifier.size(18.dp)
+                                    BorrowerAvatar(
+                                        photoUri = borrower.photoUri,
+                                        name = borrower.name,
+                                        size = 28.dp,
+                                        borderWidth = 1.dp
                                     )
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
@@ -2005,6 +2858,7 @@ fun LoansTab(viewModel: LibraryViewModel) {
     var loanFilter by rememberSaveable { mutableStateOf("Pendentes") }
     var loanSearchQuery by rememberSaveable { mutableStateOf("") }
     var showPartialReturnDialog by remember { mutableStateOf<LoanEntity?>(null) }
+    var showWhatsAppDialogForLoan by remember { mutableStateOf<LoanEntity?>(null) }
 
     val filteredLoans = remember(loans, loanFilter, loanSearchQuery) {
         val baseList = when (loanFilter) {
@@ -2023,261 +2877,287 @@ fun LoansTab(viewModel: LibraryViewModel) {
         }
     }
 
-    Column(
+    val gridCells = if (LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600) {
+        GridCells.Adaptive(minSize = 340.dp)
+    } else {
+        GridCells.Fixed(1)
+    }
+
+    LazyVerticalGrid(
+        columns = gridCells,
+        contentPadding = PaddingValues(bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp)
+            .padding(horizontal = 20.dp, vertical = 20.dp)
     ) {
-        Text(
-            text = "Movimentações & Empréstimos",
-            style = MaterialTheme.typography.headlineLarge,
-            color = ThemePurplePrimary,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "Definição automática de prazo de 14 dias para devolução. Atrasados marcados em tempo real.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = ThemeSecondaryText,
-            modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
-        )
-
-        // Statistics
-        BentoStats(books = books, loans = loans)
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Search bar inside the Circulation/Loans list
-        OutlinedTextField(
-            value = loanSearchQuery,
-            onValueChange = { loanSearchQuery = it },
-            placeholder = { Text("Buscar por título de livro, nome do leitor ou turma...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ThemeSecondaryText) },
-            trailingIcon = {
-                if (loanSearchQuery.isNotEmpty()) {
-                    IconButton(onClick = { loanSearchQuery = "" }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
-                    }
-                }
-            },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp)
-                .testTag("search_loans_input"),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = ThemePurplePrimary,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                focusedLabelColor = ThemePurplePrimary
-            ),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        // Dynamic Filter Chips instead of a single checkbox
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val filterOptions = listOf("Pendentes", "Atrasados", "Reservas", "Todos")
-            filterOptions.forEach { option ->
-                val isSelected = (loanFilter == option)
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { loanFilter = option },
-                    label = { 
-                        Text(
-                            text = when (option) {
-                                "Pendentes" -> "Ativos / Pendentes"
-                                "Atrasados" -> "Atrasados ⚠️"
-                                "Reservas" -> "Reservas / Fila 🕒"
-                                else -> "Histórico Geral"
-                            }
-                        ) 
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = when (option) {
-                            "Atrasados" -> BentoPurpleActive
-                            "Pendentes" -> BentoLilacSecondary
-                            "Reservas" -> StatusBorrowedAmberBg
-                            else -> ThemePurplePrimary
-                        },
-                        selectedLabelColor = when (option) {
-                            "Atrasados" -> BentoPurpleActiveOn
-                            "Pendentes" -> BentoLilacSecondaryOn
-                            "Reservas" -> StatusBorrowedAmberText
-                            else -> Color.White
-                        },
-                        containerColor = ThemePurpleLight.copy(alpha = 0.6f),
-                        labelColor = ThemePurplePrimary
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = isSelected,
-                        selectedBorderColor = Color.Transparent,
-                        borderColor = ThemeBorder
-                    )
+        // 1. Header label
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            val isTablet = LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600
+            val titleStyle = if (isTablet) {
+                MaterialTheme.typography.headlineLarge
+            } else {
+                MaterialTheme.typography.headlineMedium
+            }
+            Column {
+                Text(
+                    text = "Circulação & Empréstimos",
+                    style = titleStyle,
+                    color = ThemePurplePrimary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Definição automática de prazo de 14 dias para devolução. Atrasados marcados em tempo real.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ThemeSecondaryText,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
                 )
             }
         }
 
+        // 2. Statistics overview
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            Column {
+                BentoStats(books = books, loans = loans)
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
+
+        // 3. Search Bar
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            OutlinedTextField(
+                value = loanSearchQuery,
+                onValueChange = { loanSearchQuery = it },
+                placeholder = { Text("Buscar por título de livro, nome do leitor ou turma...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ThemeSecondaryText) },
+                trailingIcon = {
+                    if (loanSearchQuery.isNotEmpty()) {
+                        IconButton(onClick = { loanSearchQuery = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
+                        }
+                    }
+                },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp)
+                    .testTag("search_loans_input"),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = ThemePurplePrimary,
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedLabelColor = ThemePurplePrimary
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+
+        // 4. Dynamic Filter Chips
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val filterOptions = listOf("Pendentes", "Atrasados", "Reservas", "Todos")
+                filterOptions.forEach { option ->
+                    val isSelected = (loanFilter == option)
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { loanFilter = option },
+                        label = { 
+                            Text(
+                                text = when (option) {
+                                    "Pendentes" -> "Ativos / Pendentes"
+                                    "Atrasados" -> "Atrasados ⚠️"
+                                    "Reservas" -> "Reservas / Fila 🕒"
+                                    else -> "Histórico Geral"
+                                }
+                            ) 
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = when (option) {
+                                "Atrasados" -> BentoPurpleActive
+                                "Pendentes" -> BentoLilacSecondary
+                                "Reservas" -> StatusBorrowedAmberBg
+                                else -> ThemePurplePrimary
+                            },
+                            selectedLabelColor = when (option) {
+                                "Atrasados" -> BentoPurpleActiveOn
+                                "Pendentes" -> BentoLilacSecondaryOn
+                                "Reservas" -> StatusBorrowedAmberText
+                                else -> Color.White
+                            },
+                            containerColor = ThemePurpleLight.copy(alpha = 0.6f),
+                            labelColor = ThemePurplePrimary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            selectedBorderColor = Color.Transparent,
+                            borderColor = ThemeBorder
+                        )
+                    )
+                }
+            }
+        }
+
+        // 5. Lists or Empty States
         if (loanFilter == "Reservas") {
             if (reservations.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(RoundedCornerShape(32.dp))
-                                .background(ThemeBorder),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Schedule,
-                                contentDescription = null,
-                                tint = ThemeSecondaryText,
-                                modifier = Modifier.size(32.dp)
+                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(280.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .background(ThemeBorder),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = ThemeSecondaryText,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Nenhuma reserva ativa!",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = ThemePurplePrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "As reservas são criadas quando um livro procurado está esgotado.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = ThemeSecondaryText,
+                                modifier = Modifier.padding(top = 2.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "Nenhuma reserva ativa!",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = ThemePurplePrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "As reservas são criadas quando um livro procurado está esgotado.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = ThemeSecondaryText,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
                     }
                 }
             } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    items(reservations, key = { it.id }) { reservation ->
-                        val book = books.find { it.id == reservation.bookId }
-                        val borrowerPhone = allBorrowers.find { it.name == reservation.borrowerName }?.phone
-                        ReservationCard(
-                            reservation = reservation,
-                            bookAvailable = (book?.availableQuantity ?: 0) > 0,
-                            borrowerPhone = borrowerPhone,
-                            onPromote = {
-                                viewModel.promoteReservationToLoan(context, reservation) { success ->
-                                    if (success) {
-                                        Toast.makeText(context, "Reserva promovida a empréstimo com sucesso!", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "Falha ao emprestar exemplar.", Toast.LENGTH_SHORT).show()
-                                    }
+                items(reservations, key = { it.id }) { reservation ->
+                    val book = books.find { it.id == reservation.bookId }
+                    val borrowerPhone = allBorrowers.find { it.name == reservation.borrowerName }?.phone
+                    ReservationCard(
+                        reservation = reservation,
+                        bookAvailable = (book?.availableQuantity ?: 0) > 0,
+                        borrowerPhone = borrowerPhone,
+                        onPromote = {
+                            viewModel.promoteReservationToLoan(context, reservation) { success ->
+                                if (success) {
+                                    Toast.makeText(context, "Reserva promovida a empréstimo com sucesso!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Falha ao emprestar exemplar.", Toast.LENGTH_SHORT).show()
                                 }
-                            },
-                            onDelete = {
-                                AlertDialogHelper.showConfirmDialog(
-                                    context = context,
-                                    title = "Cancelar Reserva",
-                                    message = "Tem certeza de que deseja cancelar esta reserva para ${reservation.borrowerName}?",
-                                    onConfirm = { viewModel.deleteReservation(context, reservation.id) }
-                                )
                             }
-                        )
-                    }
+                        },
+                        onDelete = {
+                            AlertDialogHelper.showConfirmDialog(
+                                context = context,
+                                title = "Cancelar Reserva",
+                                message = "Tem certeza de que deseja cancelar esta reserva para ${reservation.borrowerName}?",
+                                onConfirm = { viewModel.deleteReservation(context, reservation.id) }
+                            )
+                        }
+                    )
                 }
             }
         } else {
             if (filteredLoans.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(RoundedCornerShape(32.dp))
-                                .background(ThemeBorder),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SwapHoriz,
-                                contentDescription = null,
-                                tint = ThemeSecondaryText,
-                                modifier = Modifier.size(32.dp)
+                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(280.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .background(ThemeBorder),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SwapHoriz,
+                                    contentDescription = null,
+                                    tint = ThemeSecondaryText,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = when (loanFilter) {
+                                    "Atrasados" -> "Sem empréstimos atrasados!"
+                                    "Pendentes" -> "Nenhum empréstimo ativo no momento!"
+                                    else -> "Nenhum empréstimo registrado"
+                                },
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = ThemePurplePrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = when (loanFilter) {
+                                    "Atrasados" -> "Parabéns! Todos os leitores estão em dia."
+                                    "Pendentes" -> "Todos os livros devidamente com sucesso!"
+                                    else -> "Realize empréstimos a partir do Acervo Geral."
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = ThemeSecondaryText,
+                                modifier = Modifier.padding(top = 2.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = when (loanFilter) {
-                                "Atrasados" -> "Sem empréstimos atrasados!"
-                                "Pendentes" -> "Nenhum empréstimo ativo no momento!"
-                                else -> "Nenhum empréstimo registrado"
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = ThemePurplePrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = when (loanFilter) {
-                                "Atrasados" -> "Parabéns! Todos os leitores estão em dia."
-                                "Pendentes" -> "Todos os livros devolvidos com sucesso!"
-                                else -> "Realize empréstimos a partir do Acervo Geral."
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = ThemeSecondaryText,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
                     }
                 }
             } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    items(filteredLoans, key = { it.id }) { loan ->
-                        val borrowerPhone = allBorrowers.find { it.name == loan.borrowerName }?.phone
-                        LoanCard(
-                            loan = loan,
-                            borrowerPhone = borrowerPhone,
-                            onRenew = {
-                                viewModel.renewLoan(context, loan.id) { success ->
-                                    if (success) {
-                                        Toast.makeText(context, "Empréstimo renovado com sucesso! (+1 semana)", Toast.LENGTH_SHORT).show()
-                                    }
+                items(filteredLoans, key = { it.id }) { loan ->
+                    val borrowerPhone = allBorrowers.find { it.name == loan.borrowerName }?.phone
+                    LoanCard(
+                        loan = loan,
+                        borrowerPhone = borrowerPhone,
+                        onRenew = {
+                            viewModel.renewLoan(context, loan.id) { success ->
+                                if (success) {
+                                    Toast.makeText(context, "Empréstimo renovado com sucesso! (+1 semana)", Toast.LENGTH_SHORT).show()
                                 }
-                            },
-                            onReturn = {
-                                if (loan.quantity > 1) {
-                                    showPartialReturnDialog = loan
-                                } else {
-                                    viewModel.returnBook(context, loan.id, 1) { success ->
-                                        if (success) {
-                                            Toast.makeText(context, "Livro devolvido com sucesso!", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                }
-                            },
-                            onDelete = {
-                                AlertDialogHelper.showConfirmDialog(
-                                    context = context,
-                                    title = "Apagar Registro",
-                                    message = "Deseja excluir este registro de empréstimo? Se o status estiver em aberto, o exemplar voltará ao acervo.",
-                                    onConfirm = { viewModel.deleteLoan(context, loan) }
-                                )
                             }
-                        )
-                    }
+                        },
+                        onReturn = {
+                            if (loan.quantity > 1) {
+                                showPartialReturnDialog = loan
+                            } else {
+                                viewModel.returnBook(context, loan.id, 1) { success ->
+                                    if (success) {
+                                        Toast.makeText(context, "Livro devolvido com sucesso!", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        },
+                        onDelete = {
+                            AlertDialogHelper.showConfirmDialog(
+                                context = context,
+                                title = "Apagar Registro",
+                                message = "Deseja excluir este registro de empréstimo? Se o status estiver em aberto, o exemplar voltará ao acervo.",
+                                onConfirm = { viewModel.deleteLoan(context, loan) }
+                            )
+                        },
+                        onAlertWhatsApp = {
+                            showWhatsAppDialogForLoan = loan
+                        }
+                    )
                 }
             }
         }
@@ -2297,6 +3177,31 @@ fun LoansTab(viewModel: LibraryViewModel) {
             }
         )
     }
+
+    showWhatsAppDialogForLoan?.let { loan ->
+        val borrowerPhone = allBorrowers.find { it.name == loan.borrowerName }?.phone
+        OverdueWhatsAppDialog(
+            loan = loan,
+            initialPhone = borrowerPhone,
+            onDismiss = { showWhatsAppDialogForLoan = null },
+            onSubmit = { finalPhone, finalMessage ->
+                showWhatsAppDialogForLoan = null
+                viewModel.updateBorrowerPhone(context, loan.borrowerName, finalPhone)
+                
+                try {
+                    val parsedNumber = finalPhone.replace(Regex("[^0-9]"), "")
+                    val ddiNumber = if (parsedNumber.length >= 12) parsedNumber else "55$parsedNumber"
+                    val url = "https://api.whatsapp.com/send?phone=$ddiNumber&text=${java.net.URLEncoder.encode(finalMessage, "UTF-8")}"
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        data = android.net.Uri.parse(url)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Erro ao abrir o WhatsApp", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -2305,18 +3210,45 @@ fun LoanCard(
     borrowerPhone: String? = null,
     onRenew: () -> Unit,
     onReturn: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onAlertWhatsApp: (() -> Unit)? = null
 ) {
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
     val isOverdue = loan.calculatedIsOverdue()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isOverdue) Color(0xFFFFECEF) else Color.White
+        ),
         border = BorderStroke(1.dp, if (isOverdue) StatusOverdueRedText else ThemeBorder),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column {
+            if (isOverdue) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(StatusOverdueRedText.copy(alpha = 0.08f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = StatusOverdueRedText,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "DEVOLUÇÃO EM ATRASO • ALERTA DE PRAZO",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = StatusOverdueRedText,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Column(modifier = Modifier.padding(16.dp)) {
             // First Row: Borrower and Delete
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -2436,22 +3368,10 @@ fun LoanCard(
                             modifier = Modifier.size(16.dp)
                         )
                     }
-                    if (isOverdue && !borrowerPhone.isNullOrBlank()) {
+                    if (isOverdue && onAlertWhatsApp != null) {
                         Spacer(modifier = Modifier.width(4.dp))
                         IconButton(
-                            onClick = {
-                                try {
-                                    val number = borrowerPhone.replace(Regex("[^0-9]"), "")
-                                    val text = "Olá ${loan.borrowerName}, lembramos que o livro '${loan.bookTitle}' (BiblioTech) está com prazo de devolução vencido. Por favor, regularize sua situação assim que possível."
-                                    val url = "https://api.whatsapp.com/send?phone=55$number&text=${java.net.URLEncoder.encode(text, "UTF-8")}"
-                                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                                        data = android.net.Uri.parse(url)
-                                    }
-                                    shareContext.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(shareContext, "Erro ao abrir o WhatsApp", Toast.LENGTH_SHORT).show()
-                                }
-                            },
+                            onClick = onAlertWhatsApp,
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
@@ -2557,6 +3477,25 @@ fun LoanCard(
                             }
                         }
 
+                        if (isOverdue && onAlertWhatsApp != null) {
+                            Button(
+                                onClick = onAlertWhatsApp,
+                                colors = ButtonDefaults.buttonColors(containerColor = StatusAvailableGreenText),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Send,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Alertar WhatsApp", fontSize = 11.sp, color = Color.White)
+                            }
+                        }
+
                         // Renew Action button
                         OutlinedButton(
                             onClick = onRenew,
@@ -2583,6 +3522,129 @@ fun LoanCard(
         }
     }
 }
+}
+
+@Composable
+fun OverdueWhatsAppDialog(
+    loan: LoanEntity,
+    initialPhone: String?,
+    onDismiss: () -> Unit,
+    onSubmit: (String, String) -> Unit
+) {
+    var phone by remember { mutableStateOf(initialPhone ?: "") }
+    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+    val defaultMsg = "Olá ${loan.borrowerName}, o livro '${loan.bookTitle}' emprestado em ${dateFormat.format(Date(loan.loanDate))} está com o prazo de devolução vencido (vencimento em ${dateFormat.format(Date(loan.dueDate))}). Por favor, regularize sua situação na biblioteca assim que possível. Obrigado! 📚"
+    var message by remember { mutableStateOf(defaultMsg) }
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Send,
+                    contentDescription = null,
+                    tint = StatusAvailableGreenText,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "Alerta de Devolução 💬",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = ThemePurplePrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Prepare uma mensagem para o leitor ${loan.borrowerName}. Ao atualizar o celular abaixo, o cadastro do leitor será atualizado na base de dados automaticamente.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ThemeSecondaryText
+                )
+
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Número de Celular") },
+                    placeholder = { Text("Ex: 11999998888") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ThemePurplePrimary,
+                        focusedLabelColor = ThemePurplePrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
+                    )
+                )
+
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = { message = it },
+                    label = { Text("Texto da Mensagem") },
+                    minLines = 3,
+                    maxLines = 5,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ThemePurplePrimary,
+                        focusedLabelColor = ThemePurplePrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (phone.isBlank()) {
+                        Toast.makeText(context, "Por favor, informe o telefone do leitor.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        onSubmit(phone, message)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = StatusAvailableGreenText),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Enviar por WhatsApp", color = Color.White)
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(
+                    onClick = {
+                        try {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("Alerta de Livro", message)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "Mensagem copiada para a área de transferência!", Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Erro ao copiar mensagem", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Copiar")
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        }
+    )
+}
 
 private fun Context.findActivity(): Activity? {
     var cur = this
@@ -2605,6 +3667,10 @@ fun SettingsTab(viewModel: LibraryViewModel) {
     var newPassword by remember { mutableStateOf("") }
     var changeStatusText by remember { mutableStateOf("") }
 
+    var isUnlocked by rememberSaveable { mutableStateOf(false) }
+    var passwordInput by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
+
     // Backup selectors
     val selectBackupFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -2626,6 +3692,23 @@ fun SettingsTab(viewModel: LibraryViewModel) {
             } catch (e: Exception) {
                 e.printStackTrace()
                 Toast.makeText(context, "Erro ao abrir arquivo.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val saveBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val jsonStr = viewModel.exportBackupToJson()
+                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    outputStream.write(jsonStr.toByteArray())
+                }
+                Toast.makeText(context, "Backup salvo com sucesso!", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(context, "Erro ao salvar backup.", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -2654,25 +3737,350 @@ fun SettingsTab(viewModel: LibraryViewModel) {
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
+    if (false) {
+        val activity = context.findActivity() as? FragmentActivity
+        val isBiometricAvailable = remember { BiometricHelper.isBiometricAvailable(context) }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            ThemePurpleLight.copy(alpha = 0.4f),
+                            ThemeBackground
+                        )
+                    )
+                )
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isSystemInDarkTheme()) Color(0xFF1E1E24).copy(alpha = 0.95f) else Color.White.copy(alpha = 0.95f)
+                ),
+                border = BorderStroke(
+                    width = 1.2.dp,
+                    color = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.15f) else ThemePurpleLight
+                ),
+                shape = RoundedCornerShape(28.dp),
+                modifier = Modifier
+                    .widthIn(max = 440.dp)
+                    .fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(32.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
+                    val userName by viewModel.userName.collectAsStateWithLifecycle()
+                    val loginMethod by viewModel.loginMethod.collectAsStateWithLifecycle()
+
+                    if (userEmail != null || !userName.isNullOrBlank()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(ThemePurpleLight.copy(alpha = 0.5f))
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(ThemePurplePrimary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = userName?.take(2)?.uppercase() ?: "AD",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = userName ?: "Administrador",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ThemeOnBackground,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = userEmail ?: "admin@escola.local",
+                                    fontSize = 10.sp,
+                                    color = ThemeSecondaryText,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(
+                                onClick = { viewModel.logout() },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Logout,
+                                    contentDescription = "Desconectar",
+                                    tint = Color.Red.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(20.dp))
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(CircleShape)
+                            .background(ThemePurpleLight),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isBiometricAvailable) Icons.Default.Face else Icons.Default.Lock,
+                            contentDescription = "Lock Icon",
+                            tint = ThemePurplePrimary,
+                            modifier = Modifier.size(38.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Text(
+                        text = "Configurações Seguras",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = ThemeOnBackground,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "A exportação de planilhas CSV, gerenciamento de banco de dados SQLite e restauração de dados exige autenticação.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ThemeSecondaryText,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(28.dp))
+
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = {
+                            passwordInput = it
+                            errorMessage = ""
+                        },
+                        label = { Text("Senha Mestre") },
+                        placeholder = { Text("Digite para desbloquear") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("admin_lock_password_input"),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ThemePurplePrimary,
+                            unfocusedBorderColor = ThemeBorder,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedLabelColor = ThemePurplePrimary
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    if (errorMessage.isNotEmpty()) {
+                        Text(
+                            text = errorMessage,
+                            color = Color(0xFFD32F2F),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(top = 10.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (isBiometricAvailable) {
+                            Button(
+                                onClick = {
+                                    if (activity != null) {
+                                        BiometricHelper.authenticate(
+                                            activity = activity,
+                                            title = "Área Administrativa",
+                                            subtitle = "Autentique com a biometria do aparelho",
+                                            onSuccess = {
+                                                isUnlocked = true
+                                                errorMessage = ""
+                                            },
+                                            onError = { err ->
+                                                errorMessage = "Toque em 'Entrar' e insira sua senha mestre."
+                                            }
+                                        )
+                                    } else {
+                                        errorMessage = "Biometria indisponível no momento."
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(50.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = ThemePurpleLight,
+                                    contentColor = ThemePurplePrimary
+                                ),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Fingerprint,
+                                    contentDescription = "Digital",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Biometria", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    val success = viewModel.login(passwordInput)
+                                    if (success) {
+                                        isUnlocked = true
+                                        errorMessage = ""
+                                    } else {
+                                        errorMessage = "Senha incorreta! Digite novamente."
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ThemePurplePrimary
+                            ),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Key,
+                                contentDescription = "Validar",
+                                modifier = Modifier.size(18.dp)
+                                    .graphicsLayer { rotationZ = -45f }
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Entrar", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = 20.dp, horizontal = 20.dp),
+        contentPadding = PaddingValues(bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item {
-            Text(
-                text = "Configurações e Backup",
-                style = MaterialTheme.typography.headlineLarge,
-                color = ThemePurplePrimary,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Administre credenciais, execute exportações de redundância e recupere acervos locais.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = ThemeSecondaryText,
-                modifier = Modifier.padding(top = 2.dp)
-            )
+            val isTablet = LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600
+            val titleStyle = if (isTablet) {
+                MaterialTheme.typography.headlineLarge
+            } else {
+                MaterialTheme.typography.headlineMedium
+            }
+            Column {
+                Text(
+                    text = "Configurações & Backup",
+                    style = titleStyle,
+                    color = ThemePurplePrimary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Administre credenciais, execute exportações de redundância e recupere acervos locais.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ThemeSecondaryText,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+
+        item {
+            val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
+            val userName by viewModel.userName.collectAsStateWithLifecycle()
+            val loginMethod by viewModel.loginMethod.collectAsStateWithLifecycle()
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = ThemePurpleLight.copy(alpha = 0.3f)),
+                border = BorderStroke(1.dp, ThemePurpleLight),
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(ThemePurplePrimary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = userName?.take(2)?.uppercase() ?: "AD",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = userName ?: "Administrador Geral",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = ThemeOnBackground
+                        )
+                        Text(
+                            text = userEmail ?: "admin@escola.local",
+                            fontSize = 12.sp,
+                            color = ThemeSecondaryText
+                        )
+                        val methodBadge = when (loginMethod) {
+                            "google" -> "Autenticado via Google Smart Auth ✨"
+                            "email" -> "Autenticado via E-mail 📧"
+                            else -> "Administrador Local (Senha Mestre) 🔑"
+                        }
+                        Text(
+                            text = methodBadge,
+                            fontSize = 11.sp,
+                            color = ThemePurplePrimary,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                    Button(
+                        onClick = { viewModel.logout() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.1f)),
+                        border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.3f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Logout, contentDescription = "Sair", tint = Color.Red, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Sair", color = Color.Red, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
         }
 
         // Card: SQLite integration info
@@ -2710,6 +4118,88 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                             color = ThemeSecondaryText,
                             modifier = Modifier.padding(top = 2.dp)
                         )
+                    }
+                }
+            }
+        }
+
+        // Card: Configuração de Empréstimos
+        item {
+            val studentDays by viewModel.studentLoanDays.collectAsStateWithLifecycle()
+            val teacherDays by viewModel.teacherLoanDays.collectAsStateWithLifecycle()
+
+            var localStudentDays by remember(studentDays) { mutableStateOf(studentDays.toString()) }
+            var localTeacherDays by remember(teacherDays) { mutableStateOf(teacherDays.toString()) }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, ThemeBorder),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(ThemePurpleLight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Timer, contentDescription = null, tint = ThemePurplePrimary)
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "Prazo Padrão de Empréstimos",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = ThemeOnBackground
+                            )
+                            Text(
+                                text = "Defina os dias limite para devoluções de alunos e professores.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = ThemeSecondaryText
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        OutlinedTextField(
+                            value = localStudentDays,
+                            onValueChange = { localStudentDays = it },
+                            label = { Text("Dias Alunos") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        OutlinedTextField(
+                            value = localTeacherDays,
+                            onValueChange = { localTeacherDays = it },
+                            label = { Text("Dias Profs") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = {
+                            val stDays = localStudentDays.toLongOrNull() ?: 7L
+                            val tcDays = localTeacherDays.toLongOrNull() ?: 15L
+                            viewModel.setStudentLoanDays(stDays)
+                            viewModel.setTeacherLoanDays(tcDays)
+                            Toast.makeText(context, "Prazos salvos com sucesso!", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Text("Salvar Prazos", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -2923,6 +4413,49 @@ fun SettingsTab(viewModel: LibraryViewModel) {
             }
         }
 
+        // Card: Integrar com Plataformas Externas
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, ThemeBorder),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Integração Libib e Goodreads",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = ThemeOnBackground
+                    )
+                    Text(
+                        text = "Sincronização bidirecional com sua estante virtual do Goodreads e inventário Libib.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ThemeSecondaryText,
+                        modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(ThemeSecondaryText.copy(alpha = 0.1f))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.CloudSync, contentDescription = "Sincronizar", tint = ThemeSecondaryText, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Disponível na próxima atualização da API.",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = ThemeSecondaryText
+                        )
+                    }
+                }
+            }
+        }
+
         // Card: Gerenciamento de Backup
         item {
             Card(
@@ -2945,46 +4478,65 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                         modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
                     )
 
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Button(
-                            onClick = {
-                                val intent = viewModel.getShareBackupIntent(context)
-                                if (intent != null) {
-                                    context.startActivity(Intent.createChooser(intent, "Compartilhar Backup"))
-                                } else {
-                                    Toast.makeText(context, "Erro ao gerar arquivo de backup.", Toast.LENGTH_SHORT).show()
-                                }
-                            },
+                            onClick = { saveBackupLauncher.launch("bibliotech_backup.json") },
                             colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
-                                .weight(1f)
+                                .fillMaxWidth()
                                 .height(44.dp)
-                                .testTag("export_backup_button")
+                                .testTag("save_backup_button")
                         ) {
-                            Icon(Icons.Default.Share, contentDescription = null)
+                            Icon(Icons.Default.SaveAlt, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Exportar Backup")
+                            Text("Salvar no Dispositivo")
                         }
 
-                        Button(
-                            onClick = {
-                                selectBackupFileLauncher.launch("application/json")
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = ThemeBackground),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp)
-                                .testTag("restore_backup_button"),
-                            border = BorderStroke(1.dp, ThemeBorder)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(Icons.Default.FileUpload, contentDescription = null, tint = ThemePurplePrimary)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Restaurar Backup", color = ThemePurplePrimary)
+                            Button(
+                                onClick = {
+                                    val intent = viewModel.getShareBackupIntent(context)
+                                    if (intent != null) {
+                                        context.startActivity(Intent.createChooser(intent, "Compartilhar Backup"))
+                                    } else {
+                                        Toast.makeText(context, "Erro ao gerar arquivo de backup.", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = ThemePurpleLight.copy(alpha=0.5f), contentColor = ThemePurplePrimary),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                                    .testTag("export_backup_button")
+                            ) {
+                                Icon(Icons.Default.Share, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Compartilhar")
+                            }
+
+                            Button(
+                                onClick = {
+                                    selectBackupFileLauncher.launch("application/json")
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = ThemeBackground),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                                    .testTag("restore_backup_button"),
+                                border = BorderStroke(1.dp, ThemeBorder)
+                            ) {
+                                Icon(Icons.Default.FileUpload, contentDescription = null, tint = ThemePurplePrimary)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Restaurar", color = ThemePurplePrimary)
+                            }
                         }
                     }
                 }
@@ -2992,6 +4544,8 @@ fun SettingsTab(viewModel: LibraryViewModel) {
         }
     }
 }
+}
+
 
 // --- SCREEN: ADD & EDIT BOOK ---
 @OptIn(ExperimentalMaterial3Api::class)
@@ -3012,8 +4566,10 @@ fun AddEditBookScreen(
     var selectedGenre by remember { mutableStateOf(bookToEdit?.genre ?: "Literatura Clássica") }
     var photoPathByUri by remember { mutableStateOf<String?>(bookToEdit?.photoPath) }
     
-    var isbnToSearch by remember { mutableStateOf("") }
+    var isbnToSearch by remember { mutableStateOf(bookToEdit?.isbn ?: "") }
     var isSearchingIsbn by remember { mutableStateOf(false) }
+    var isSearchingCovers by remember { mutableStateOf(false) }
+    var foundCoversList by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
 
     var dropdownExpanded by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf("") }
@@ -3046,7 +4602,7 @@ fun AddEditBookScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(20.dp)
-            .verticalScroll(rememberScrollState())
+            .verticalScrollWithKeyboard(rememberScrollState())
     ) {
         // Appbar Form Header containing actions
         Row(
@@ -3082,6 +4638,7 @@ fun AddEditBookScreen(
                                 context = context,
                                 title = title,
                                 author = author,
+                                isbn = isbnToSearch,
                                 genre = selectedGenre,
                                 year = parsedYear,
                                 location = location,
@@ -3095,6 +4652,7 @@ fun AddEditBookScreen(
                                 book = bookToEdit,
                                 title = title,
                                 author = author,
+                                isbn = isbnToSearch,
                                 genre = selectedGenre,
                                 year = parsedYear,
                                 location = location,
@@ -3128,16 +4686,23 @@ fun AddEditBookScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Preenchimento Automático por ISBN",
+                        text = "Preenchimento Automático via Busca ISBN / CBL",
                         style = MaterialTheme.typography.labelMedium,
                         color = ThemePurplePrimary,
                         fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Consulte bancos nacionais da CBL (BrasilAPI) e Google Books",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
                             value = isbnToSearch,
                             onValueChange = { isbnToSearch = it.filter { ch -> ch.isDigit() || ch == '-' } },
+                            label = { Text("ISBN (Opcional)") },
                             placeholder = { Text("Ex: 9788532530783") },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
@@ -3153,11 +4718,17 @@ fun AddEditBookScreen(
                             onClick = {
                                 if (isbnToSearch.isNotBlank()) {
                                     isSearchingIsbn = true
-                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                        val cleanIsbn = isbnToSearch.replace("-", "").trim()
+                                        var foundBookData = false
+
+                                        // ENGINE 1: BrasilAPI (Official CBL & Brazilian Book Database)
                                         try {
-                                            val url = java.net.URL("https://www.googleapis.com/books/v1/volumes?q=isbn:${isbnToSearch}")
+                                            val url = java.net.URL("https://brasilapi.com.br/api/isbn/v1/${cleanIsbn}")
                                             val connection = url.openConnection() as java.net.HttpURLConnection
                                             connection.requestMethod = "GET"
+                                            connection.connectTimeout = 8000
+                                            connection.readTimeout = 8000
                                             val responseCode = connection.responseCode
                                             if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
                                                 val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.inputStream))
@@ -3165,56 +4736,98 @@ fun AddEditBookScreen(
                                                 reader.close()
                                                 
                                                 val jsonObj = org.json.JSONObject(response)
-                                                if (jsonObj.has("items") && jsonObj.getJSONArray("items").length() > 0) {
-                                                    val item = jsonObj.getJSONArray("items").getJSONObject(0)
-                                                    val volumeInfo = item.getJSONObject("volumeInfo")
-                                                    
-                                                    val foundTitle = if (volumeInfo.has("title")) volumeInfo.getString("title") else ""
-                                                    val foundAuthors = if (volumeInfo.has("authors")) {
-                                                        val authorsArray = volumeInfo.getJSONArray("authors")
-                                                        if (authorsArray.length() > 0) authorsArray.getString(0) else ""
-                                                    } else {
-                                                        ""
+                                                val foundTitle = if (jsonObj.has("title") && !jsonObj.isNull("title")) jsonObj.getString("title") else ""
+                                                val foundAuthors = if (jsonObj.has("authors") && !jsonObj.isNull("authors")) {
+                                                    val authorsArray = jsonObj.getJSONArray("authors")
+                                                    val authorsList = mutableListOf<String>()
+                                                    for (i in 0 until authorsArray.length()) {
+                                                        authorsList.add(authorsArray.getString(i))
                                                     }
-                                                    val foundYear = if (volumeInfo.has("publishedDate")) {
-                                                        val date = volumeInfo.getString("publishedDate")
-                                                        date.take(4)
-                                                    } else {
-                                                        ""
+                                                    authorsList.joinToString(", ")
+                                                } else ""
+                                                
+                                                val foundYear = if (jsonObj.has("year") && !jsonObj.isNull("year")) jsonObj.get("year").toString() else ""
+                                                val foundCover = if (jsonObj.has("cover_url") && !jsonObj.isNull("cover_url")) jsonObj.getString("cover_url") else null
+                                                val foundPublisher = if (jsonObj.has("publisher") && !jsonObj.isNull("publisher")) jsonObj.getString("publisher") else ""
+                                                
+                                                val subjectStr = if (jsonObj.has("subjects") && !jsonObj.isNull("subjects")) {
+                                                    val array = jsonObj.getJSONArray("subjects")
+                                                    val list = mutableListOf<String>()
+                                                    for (i in 0 until array.length()) {
+                                                        list.add(array.getString(i).lowercase(java.util.Locale.getDefault()))
                                                     }
-                                                    val foundThumbnail = if (volumeInfo.has("imageLinks")) {
-                                                        val links = volumeInfo.getJSONObject("imageLinks")
-                                                        if (links.has("thumbnail")) links.getString("thumbnail").replace("http:", "https:") else null
-                                                    } else null
+                                                    list.joinToString(" ")
+                                                } else ""
 
-                                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                        if (foundTitle.isNotBlank()) title = foundTitle
-                                                        if (foundAuthors.isNotBlank()) author = foundAuthors
-                                                        if (foundYear.isNotBlank()) year = foundYear
-                                                        if (foundThumbnail != null) {
-                                                            // We cannot simply set local path for coil to load an external url in this specific setup if it expects a file, 
-                                                            // but `photoPath` is string and AsyncImage can load URL if passed properly. Let's just set it.
-                                                            photoPathByUri = foundThumbnail
-                                                        }
-                                                        isSearchingIsbn = false
-                                                        Toast.makeText(context, "Dados importados do Google Books!", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                } else {
-                                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                        isSearchingIsbn = false
-                                                        Toast.makeText(context, "ISBN não encontrado no Google Books.", Toast.LENGTH_SHORT).show()
-                                                    }
+                                                val mappedGenre = when {
+                                                    subjectStr.contains("ficção científica") || subjectStr.contains("ciencia ficcao") || subjectStr.contains("sci-fi") -> "Ficção Científica"
+                                                    subjectStr.contains("história") || subjectStr.contains("historia") || subjectStr.contains("history") -> "História"
+                                                    subjectStr.contains("poesia") || subjectStr.contains("poema") || subjectStr.contains("poetry") -> "Poesia"
+                                                    subjectStr.contains("escola") || subjectStr.contains("didático") || subjectStr.contains("didatico") || subjectStr.contains("educação") || subjectStr.contains("ensino") || subjectStr.contains("didática") -> "Didáticos"
+                                                    subjectStr.contains("mistério") || subjectStr.contains("misterio") || subjectStr.contains("policial") || subjectStr.contains("crime") || subjectStr.contains("thriller") || subjectStr.contains("suspense") -> "Mistério"
+                                                    subjectStr.contains("romance") || subjectStr.contains("novela") || subjectStr.contains("ficção") || subjectStr.contains("fiction") -> "Romance"
+                                                    subjectStr.contains("clássico") || subjectStr.contains("classico") || subjectStr.contains("clássicos") -> "Literatura Clássica"
+                                                    else -> "Outros"
                                                 }
-                                            } else {
+
                                                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                    if (foundTitle.isNotBlank()) title = foundTitle
+                                                    if (foundAuthors.isNotBlank()) author = foundAuthors
+                                                    if (foundYear.isNotBlank()) year = foundYear
+                                                    if (foundPublisher.isNotBlank()) {
+                                                        location = "Ed. $foundPublisher"
+                                                    }
+                                                    selectedGenre = mappedGenre
+                                                    if (foundCover != null && foundCover.isNotBlank()) {
+                                                        photoPathByUri = foundCover
+                                                    }
                                                     isSearchingIsbn = false
-                                                    Toast.makeText(context, "Erro ao buscar ISBN.", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, "Dados carregados do Busca ISBN nacional!", Toast.LENGTH_SHORT).show()
                                                 }
+                                                foundBookData = true
                                             }
                                         } catch (e: Exception) {
+                                            // Fallback to Google Books on error
+                                        }
+
+                                        // ENGINE 2: Google Books API (Fallback if BrasilAPI has no record or errored)
+                                        if (!foundBookData) {
+                                            try {
+                                                val response = com.example.network.ApiClient.googleBooksApi.searchBooks("isbn:$cleanIsbn")
+                                                if (response.isSuccessful) {
+                                                    val body = response.body()
+                                                    if (body?.items != null && body.items.isNotEmpty()) {
+                                                        val volumeInfo = body.items[0].volumeInfo
+                                                        if (volumeInfo != null) {
+                                                            val foundTitle = volumeInfo.title ?: ""
+                                                            val foundAuthors = volumeInfo.authors?.firstOrNull() ?: ""
+                                                            val foundYear = volumeInfo.publishedDate?.take(4) ?: ""
+                                                            val foundThumbnail = volumeInfo.imageLinks?.thumbnail?.replace("http:", "https:")
+
+                                                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                                if (foundTitle.isNotBlank()) title = foundTitle
+                                                                if (foundAuthors.isNotBlank()) author = foundAuthors
+                                                                if (foundYear.isNotBlank()) year = foundYear
+                                                                if (foundThumbnail != null) {
+                                                                    photoPathByUri = foundThumbnail
+                                                                }
+                                                                isSearchingIsbn = false
+                                                                Toast.makeText(context, "Dados importados do Google Books!", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                            foundBookData = true
+                                                        }
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                // Ignore and handle collectively below
+                                            }
+                                        }
+
+                                        // If both engines failed to retrieve the book data
+                                        if (!foundBookData) {
                                             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                                 isSearchingIsbn = false
-                                                Toast.makeText(context, "Erro de conexão.", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "ISBN não encontrado ou erro de conexão.", Toast.LENGTH_LONG).show()
                                             }
                                         }
                                     }
@@ -3233,6 +4846,7 @@ fun AddEditBookScreen(
                     }
                 }
             }
+            
             Spacer(modifier = Modifier.height(16.dp))
         }
 
@@ -3288,6 +4902,290 @@ fun AddEditBookScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Selecione uma Capa", fontWeight = FontWeight.Bold, color = ThemePurplePrimary, fontSize = 14.sp)
                         Text("Formatos: JPG ou PNG offline.", color = ThemeSecondaryText, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Universal Cover Finder Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = ThemePurpleLight.copy(alpha = 0.5f)),
+            border = BorderStroke(1.dp, ThemePurplePrimary.copy(alpha = 0.2f)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = ThemePurplePrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Buscador de Capas em Alta Resolução",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = ThemePurplePrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    text = "Consulte simultaneamente as grandes bases (Amazon, Open Library, Google Books, CBL/BrasilAPI, Libib e Goodreads) por ISBN.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ThemeSecondaryText,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = isbnToSearch,
+                        onValueChange = { isbnToSearch = it.filter { ch -> ch.isDigit() || ch == '-' } },
+                        label = { Text("Código ISBN do Livro") },
+                        placeholder = { Text("Ex: 9788532530783") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ThemePurplePrimary,
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            focusedLabelColor = ThemePurplePrimary
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val cleanIsbn = isbnToSearch.replace("-", "").trim()
+                            if (cleanIsbn.isNotBlank()) {
+                                isSearchingCovers = true
+                                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                    val results = mutableListOf<Pair<String, String>>()
+                                    
+                                    // 1. Open Library (with force 404 for missing covers)
+                                    try {
+                                        val olUrl = "https://covers.openlibrary.org/b/isbn/$cleanIsbn-L.jpg?default=false"
+                                        val conn = java.net.URL(olUrl).openConnection() as java.net.HttpURLConnection
+                                        conn.requestMethod = "GET"
+                                        conn.connectTimeout = 3000
+                                        conn.readTimeout = 3000
+                                        if (conn.responseCode == 200) {
+                                            results.add("Open Library" to olUrl)
+                                        }
+                                    } catch (e: Exception) {
+                                        // Ignore
+                                    }
+
+                                    // 2. Amazon High-Resolution (Calibre approach check)
+                                    try {
+                                        val isbn10 = if (cleanIsbn.length == 13 && cleanIsbn.startsWith("978")) {
+                                            val middle = cleanIsbn.substring(3, 12)
+                                            var sum = 0
+                                            for (i in 0 until 9) {
+                                                sum += (middle[i] - '0') * (10 - i)
+                                            }
+                                            val check = 11 - (sum % 11)
+                                            val checkStr = when (check) {
+                                                10 -> "X"
+                                                11 -> "0"
+                                                else -> check.toString()
+                                            }
+                                            middle + checkStr
+                                        } else {
+                                            cleanIsbn
+                                        }
+                                        
+                                        val amzUrl = "https://images.amazon.com/images/P/$isbn10.01.LZZZZZZZ.jpg"
+                                        val conn = java.net.URL(amzUrl).openConnection() as java.net.HttpURLConnection
+                                        conn.requestMethod = "GET"
+                                        conn.connectTimeout = 3000
+                                        conn.readTimeout = 3000
+                                        val length = conn.contentLength
+                                        // Amazon returns 200 for 1x1 spacer gif if not found; we check contentLength
+                                        if (conn.responseCode == 200 && length > 1500) {
+                                            results.add("Amazon (Alta Res)" to amzUrl)
+                                        }
+                                    } catch (e: Exception) {
+                                        // Ignore
+                                    }
+
+                                    // 3. Google Books (Max Quality zoom upgrade)
+                                    try {
+                                        val response = com.example.network.ApiClient.googleBooksApi.searchBooks("isbn:$cleanIsbn")
+                                        if (response.isSuccessful) {
+                                            val body = response.body()
+                                            if (body?.items != null && body.items.isNotEmpty()) {
+                                                val volInfo = body.items[0].volumeInfo
+                                                val thumb = volInfo?.imageLinks?.thumbnail
+                                                if (thumb != null) {
+                                                    val highResThumb = thumb.replace("http:", "https:")
+                                                        .replace("&zoom=1", "&zoom=2")
+                                                        .replace("&zoom=5", "&zoom=2")
+                                                        .replace("edge=curl", "")
+                                                    results.add("Google Books" to highResThumb)
+                                                }
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        // Ignore
+                                    }
+
+                                    // 4. BrasilAPI Cover fallback
+                                    try {
+                                        val brUrl = "https://brasilapi.com.br/api/isbn/v1/$cleanIsbn"
+                                        val conn = java.net.URL(brUrl).openConnection() as java.net.HttpURLConnection
+                                        conn.requestMethod = "GET"
+                                        conn.connectTimeout = 3000
+                                        conn.readTimeout = 3000
+                                        if (conn.responseCode == 200) {
+                                            val text = conn.inputStream.bufferedReader().use { it.readText() }
+                                            val json = org.json.JSONObject(text)
+                                            val cover = if (json.has("cover_url") && !json.isNull("cover_url")) json.getString("cover_url") else null
+                                            if (!cover.isNullOrBlank()) {
+                                                results.add("BrasilAPI (CBL)" to cover)
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        // Ignore
+                                    }
+
+                                    // 5. Mercado Editorial API (Brasil)
+                                    try {
+                                        val meUrl = "https://api.mercadoeditorial.org/api/v1.2/book?isbn=$cleanIsbn"
+                                        val conn = java.net.URL(meUrl).openConnection() as java.net.HttpURLConnection
+                                        conn.requestMethod = "GET"
+                                        conn.connectTimeout = 3000
+                                        conn.readTimeout = 3000
+                                        if (conn.responseCode == 200) {
+                                            val text = conn.inputStream.bufferedReader().use { it.readText() }
+                                            val responseObj = org.json.JSONObject(text)
+                                            if (responseObj.has("books")) {
+                                                val booksArray = responseObj.getJSONArray("books")
+                                                if (booksArray.length() > 0) {
+                                                    val bookJson = booksArray.getJSONObject(0)
+                                                    val cover = if (bookJson.has("imagem_capa") && !bookJson.isNull("imagem_capa")) bookJson.getString("imagem_capa") else null
+                                                    if (!cover.isNullOrBlank()) {
+                                                        results.add("Mercado Editorial" to cover)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        // Ignore
+                                    }
+
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                        isSearchingCovers = false
+                                        foundCoversList = results
+                                        if (results.isEmpty()) {
+                                            Toast.makeText(context, "Nenhuma imagem encontrada nos bancos de dados para este ISBN.", Toast.LENGTH_LONG).show()
+                                        } else {
+                                            Toast.makeText(context, "Encontradas ${results.size} opções de capas!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            } else {
+                                Toast.makeText(context, "Por favor, digite um código ISBN.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        enabled = !isSearchingCovers && isbnToSearch.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.padding(start = 8.dp).height(56.dp)
+                    ) {
+                        if (isSearchingCovers) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text("Buscar Capas", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                
+                if (foundCoversList.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Escolha sua capa preferida:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ThemePurplePrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScrollWithKeyboard(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        foundCoversList.forEach { (source, coverUrl) ->
+                            val isSelected = photoPathByUri == coverUrl
+                            Card(
+                                modifier = Modifier
+                                    .width(110.dp)
+                                    .clickable {
+                                        photoPathByUri = coverUrl
+                                        Toast.makeText(context, "Capa da fonte: $source selecionada!", Toast.LENGTH_SHORT).show()
+                                    },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isSelected) ThemePurplePrimary.copy(alpha = 0.1f) else Color.White
+                                ),
+                                border = BorderStroke(
+                                    width = if (isSelected) 2.dp else 1.dp,
+                                    color = if (isSelected) ThemePurplePrimary else ThemeBorder.copy(alpha = 0.5f)
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(90.dp, 120.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color.LightGray.copy(alpha = 0.3f))
+                                    ) {
+                                        AsyncImage(
+                                            model = coverUrl,
+                                            contentDescription = "Capa de $source",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                        if (isSelected) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(ThemePurplePrimary.copy(alpha = 0.2f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.CheckCircle,
+                                                    contentDescription = "Selecionada",
+                                                    tint = ThemePurplePrimary,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = source,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) ThemePurplePrimary else ThemeSecondaryText,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -3444,7 +5342,7 @@ fun AddEditBookScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(112.dp))
     }
 }
 
@@ -3488,211 +5386,244 @@ fun BorrowersTab(viewModel: LibraryViewModel) {
     
     var filterType by rememberSaveable { mutableStateOf("Todos") } // "Todos", "Aluno", "Professor"
 
-    Column(
+    val gridCells = if (LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600) {
+        GridCells.Adaptive(minSize = 260.dp)
+    } else {
+        GridCells.Fixed(1)
+    }
+
+    val filteredList = remember(borrowers, filterType) {
+        borrowers.filter {
+            filterType == "Todos" || it.type.lowercase() == filterType.lowercase()
+        }
+    }
+
+    val groupedByTurma = remember(filteredList) {
+        filteredList.groupBy { it.classRoom.trim().ifBlank { "Sem Turma" } }
+            .toSortedMap(String.CASE_INSENSITIVE_ORDER)
+    }
+
+    LazyVerticalGrid(
+        columns = gridCells,
+        contentPadding = PaddingValues(bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp)
+            .padding(horizontal = 20.dp, vertical = 20.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Alunos & Professores",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = ThemePurplePrimary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Gerencie o cadastro de leitores do colégio e consulte seus históricos.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ThemeSecondaryText,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
-
-            Button(
-                onClick = { showDialogForNewBorrower = true },
-                colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.testTag("add_borrower_button")
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Cadastrar")
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Novo Leitor", fontSize = 14.sp)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Large search bar
-        OutlinedTextField(
-            value = borrowerSearchQuery,
-            onValueChange = { viewModel.searchBorrowers(it) },
-            placeholder = { Text("Buscar leitor por nome, turma ou disciplina...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ThemeSecondaryText) },
-            trailingIcon = {
-                if (borrowerSearchQuery.isNotEmpty()) {
-                    IconButton(onClick = { viewModel.searchBorrowers("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
-                    }
-                }
-            },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("search_borrowers_input"),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = ThemePurplePrimary,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                focusedLabelColor = ThemePurplePrimary
-            ),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Filter chips row
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            listOf("Todos", "Aluno", "Professor").forEach { type ->
-                FilterChip(
-                    selected = filterType == type,
-                    onClick = { filterType = type },
-                    label = { Text(type) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = BentoLilacSecondary,
-                        selectedLabelColor = BentoLilacSecondaryOn,
-                        selectedLeadingIconColor = ThemePurplePrimary
-                    ),
-                    modifier = Modifier.testTag("filter_borrower_chip_$type")
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Filtering list
-        val filteredList = remember(borrowers, filterType) {
-            borrowers.filter {
-                filterType == "Todos" || it.type.lowercase() == filterType.lowercase()
-            }
-        }
-
-        if (filteredList.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(RoundedCornerShape(32.dp))
-                            .background(ThemeBorder),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = ThemeSecondaryText,
-                            modifier = Modifier.size(32.dp)
+        // 1. Header label & actions
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            val isTablet = LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600
+            if (isTablet) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Alunos & Professores",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = ThemePurplePrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Gerencie o cadastro de leitores do colégio e consulte seus históricos.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = ThemeSecondaryText,
+                            modifier = Modifier.padding(top = 2.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Button(
+                        onClick = { showDialogForNewBorrower = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.testTag("add_borrower_button")
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Cadastrar")
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Novo Leitor", fontSize = 14.sp)
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Text(
-                        text = "Nenhum leitor cadastrado",
-                        style = MaterialTheme.typography.bodyLarge,
+                        text = "Alunos & Professores",
+                        style = MaterialTheme.typography.headlineMedium,
                         color = ThemePurplePrimary,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Comece cadastrando um aluno ou professor para registrar empréstimos vinculados.",
+                        text = "Gerencie o cadastro de leitores do colégio e consulte seus históricos.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = ThemeSecondaryText,
-                        modifier = Modifier.padding(top = 2.dp),
-                        textAlign = TextAlign.Center
+                        color = ThemeSecondaryText
+                    )
+                    Button(
+                        onClick = { showDialogForNewBorrower = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("add_borrower_button")
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Cadastrar")
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Novo Leitor", fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+
+        // 2. Search Field
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            OutlinedTextField(
+                value = borrowerSearchQuery,
+                onValueChange = { viewModel.searchBorrowers(it) },
+                placeholder = { Text("Buscar leitor por nome, turma ou disciplina...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ThemeSecondaryText) },
+                trailingIcon = {
+                    if (borrowerSearchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.searchBorrowers("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
+                        }
+                    }
+                },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("search_borrowers_input"),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = ThemePurplePrimary,
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedLabelColor = ThemePurplePrimary
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+
+        // 3. Filter Chips selection
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                listOf("Todos", "Aluno", "Professor").forEach { type ->
+                    FilterChip(
+                        selected = filterType == type,
+                        onClick = { filterType = type },
+                        label = { Text(type) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = BentoLilacSecondary,
+                            selectedLabelColor = BentoLilacSecondaryOn,
+                            selectedLeadingIconColor = ThemePurplePrimary
+                        ),
+                        modifier = Modifier.testTag("filter_borrower_chip_$type")
                     )
                 }
             }
-        } else {
-            // Adaptive grid
-            val gridCells = if (LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600) {
-                GridCells.Adaptive(minSize = 260.dp)
-            } else {
-                GridCells.Fixed(1)
-            }
+        }
 
-            val groupedByTurma = remember(filteredList) {
-                filteredList.groupBy { it.classRoom.trim().ifBlank { "Sem Turma" } }
-                    .toSortedMap(String.CASE_INSENSITIVE_ORDER)
-            }
-
-            LazyVerticalGrid(
-                columns = gridCells,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                groupedByTurma.forEach { (turma, borrowersInTurma) ->
-                    item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = ThemePurpleLight),
-                            shape = RoundedCornerShape(8.dp),
+        // 4. Content section
+        if (filteredList.isEmpty()) {
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 10.dp, bottom = 4.dp)
+                                .size(64.dp)
+                                .clip(RoundedCornerShape(32.dp))
+                                .background(ThemeBorder),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = ThemeSecondaryText,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Nenhum leitor cadastrado",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = ThemePurplePrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Comece cadastrando um aluno ou professor para registrar empréstimos vinculados.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = ThemeSecondaryText,
+                            modifier = Modifier.padding(top = 2.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        } else {
+            groupedByTurma.forEach { (turma, borrowersInTurma) ->
+                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = ThemePurpleLight),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp, bottom = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.School,
+                                contentDescription = null,
+                                tint = ThemePurplePrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Turma: $turma",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = ThemePurplePrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(ThemePurplePrimary)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.School,
-                                    contentDescription = null,
-                                    tint = ThemePurplePrimary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Turma: $turma",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = ThemePurplePrimary,
+                                    text = "${borrowersInTurma.size}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(ThemePurplePrimary)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "${borrowersInTurma.size}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
                             }
                         }
                     }
+                }
 
-                    items(borrowersInTurma) { borrower ->
-                        val totalActive = loans.count { it.borrowerName.lowercase() == borrower.name.lowercase() && it.returnDate == null }
-                        BorrowerCard(
-                            borrower = borrower,
-                            totalActiveLoans = totalActive,
-                            onClick = { selectedBorrowerForDetails = borrower }
-                        )
-                    }
+                items(borrowersInTurma) { borrower ->
+                    val totalActive = loans.count { it.borrowerName.lowercase() == borrower.name.lowercase() && it.returnDate == null }
+                    BorrowerCard(
+                        borrower = borrower,
+                        totalActiveLoans = totalActive,
+                        onClick = { selectedBorrowerForDetails = borrower }
+                    )
                 }
             }
         }
@@ -3751,20 +5682,11 @@ fun BorrowerCard(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(if (borrower.type == "Professor") BentoLilacSecondary else ThemeBackground),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (borrower.type == "Professor") Icons.Default.School else Icons.Default.Person,
-                    contentDescription = null,
-                    tint = ThemePurplePrimary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            BorrowerAvatar(
+                photoUri = borrower.photoUri,
+                name = borrower.name,
+                size = 44.dp
+            )
 
             Spacer(modifier = Modifier.width(16.dp))
 
@@ -3828,6 +5750,68 @@ fun BorrowerCard(
 }
 
 @Composable
+fun BorrowerAvatar(
+    photoUri: String?,
+    name: String,
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 72.dp,
+    borderWidth: androidx.compose.ui.unit.Dp = 1.5.dp
+) {
+    val initials = if (name.isNotBlank()) name.take(2).uppercase() else "LE"
+    val avatarColorAndIcon = remember(photoUri) {
+        when (photoUri) {
+            "avatar:blue" -> Pair(Color(0xFF2196F3), Icons.Default.School)
+            "avatar:green" -> Pair(Color(0xFF4CAF50), Icons.Default.AutoStories)
+            "avatar:orange" -> Pair(Color(0xFFFF9800), Icons.Default.Mood)
+            "avatar:red" -> Pair(Color(0xFFE91E63), Icons.Default.LocalLibrary)
+            "avatar:indigo" -> Pair(Color(0xFF3F51B5), Icons.Default.Star)
+            else -> null
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color.White)
+            .border(borderWidth, ThemePurplePrimary, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        if (avatarColorAndIcon != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(avatarColorAndIcon.first.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = avatarColorAndIcon.second,
+                    contentDescription = null,
+                    tint = avatarColorAndIcon.first,
+                    modifier = Modifier.fillMaxSize(0.55f)
+                )
+            }
+        } else if (!photoUri.isNullOrEmpty() && (photoUri.startsWith("content://") || photoUri.startsWith("file://") || photoUri.startsWith("http"))) {
+            AsyncImage(
+                model = photoUri,
+                contentDescription = "Foto do Leitor",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                error = androidx.compose.ui.graphics.vector.rememberVectorPainter(Icons.Default.Person)
+            )
+        } else {
+            // Initials Fallback
+            Text(
+                text = initials,
+                fontSize = (size.value * 0.33).sp,
+                fontWeight = FontWeight.Bold,
+                color = ThemePurplePrimary
+            )
+        }
+    }
+}
+
+@Composable
 fun AddEditBorrowerDialog(
     borrowerToEdit: BorrowerEntity?,
     viewModel: LibraryViewModel,
@@ -3840,6 +5824,15 @@ fun AddEditBorrowerDialog(
     var identifier by remember { mutableStateOf(borrowerToEdit?.identifier ?: "") }
     var phone by remember { mutableStateOf(borrowerToEdit?.phone ?: "") }
     var errorText by remember { mutableStateOf("") }
+    var photoUri by remember { mutableStateOf<String?>(borrowerToEdit?.photoUri) }
+
+    val photoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            photoUri = uri.toString()
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -3851,7 +5844,7 @@ fun AddEditBorrowerDialog(
                 modifier = Modifier
                     .padding(20.dp)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScrollWithKeyboard(rememberScrollState())
             ) {
                 Text(
                     text = if (borrowerToEdit == null) "Cadastrar Leitor" else "Editar Cadastro",
@@ -3859,6 +5852,115 @@ fun AddEditBorrowerDialog(
                     color = ThemePurplePrimary,
                     fontWeight = FontWeight.Bold
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Avatar / Foto Section
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Foto de Identificação (Opcional)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ThemeOnBackground
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        BorrowerAvatar(
+                            photoUri = photoUri,
+                            name = name,
+                            size = 80.dp,
+                            borderWidth = 2.dp
+                        )
+
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Button(
+                                onClick = { photoLauncher.launch("image/*") },
+                                colors = ButtonDefaults.buttonColors(containerColor = ThemePurpleLight),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Carregar da Galeria", color = ThemePurplePrimary, fontSize = 12.sp, maxLines = 1)
+                            }
+
+                            if (photoUri != null) {
+                                Button(
+                                    onClick = { photoUri = null },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEBEE)),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Remover Foto", color = Color.Red, fontSize = 12.sp, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Escolha um Avatar Rápido:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = ThemeSecondaryText
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val avatarOptions = listOf(
+                            "avatar:blue" to Color(0xFF2196F3),
+                            "avatar:green" to Color(0xFF4CAF50),
+                            "avatar:orange" to Color(0xFFFF9800),
+                            "avatar:red" to Color(0xFFE91E63),
+                            "avatar:indigo" to Color(0xFF3F51B5)
+                        )
+
+                        avatarOptions.forEach { (optionId, color) ->
+                            val isSelected = photoUri == optionId
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 4.dp)
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .border(
+                                        width = if (isSelected) 3.dp else 0.dp,
+                                        color = if (isSelected) ThemePurplePrimary else Color.Transparent,
+                                        shape = CircleShape
+                                    )
+                                    .clickable { photoUri = optionId },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selecionado",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -4016,10 +6118,10 @@ fun AddEditBorrowerDialog(
                                 val finalIdentifier = identifier.trim().ifBlank { "Sem Matrícula" }
 
                                 if (borrowerToEdit == null) {
-                                    viewModel.addBorrower(context, name.trim(), type, finalIdentifier, phone.trim(), finalClassRoom)
+                                    viewModel.addBorrower(context, name.trim(), type, finalIdentifier, phone.trim(), finalClassRoom, photoUri)
                                     Toast.makeText(context, "$type cadastrado com sucesso!", Toast.LENGTH_SHORT).show()
                                 } else {
-                                    viewModel.updateBorrower(context, borrowerToEdit, name.trim(), type, finalIdentifier, phone.trim(), finalClassRoom)
+                                    viewModel.updateBorrower(context, borrowerToEdit, name.trim(), type, finalIdentifier, phone.trim(), finalClassRoom, photoUri)
                                     Toast.makeText(context, "Cadastro atualizado!", Toast.LENGTH_SHORT).show()
                                 }
                                 onDismiss()
@@ -4068,6 +6170,7 @@ fun BorrowerDetailsDialog(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(20.dp)
+                    .verticalScrollWithKeyboard(rememberScrollState())
             ) {
                 // Header details
                 Row(
@@ -4079,20 +6182,11 @@ fun BorrowerDetailsDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(ThemeBackground),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (borrower.type == "Professor") Icons.Default.School else Icons.Default.Person,
-                                contentDescription = null,
-                                tint = ThemePurplePrimary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                        BorrowerAvatar(
+                            photoUri = borrower.photoUri,
+                            name = borrower.name,
+                            size = 48.dp
+                        )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
@@ -4517,6 +6611,7 @@ fun BookDetailsDialog(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(20.dp)
+                    .verticalScrollWithKeyboard(rememberScrollState())
             ) {
                 // Top row title and edit buttons
                 Row(
@@ -4604,9 +6699,17 @@ fun BookDetailsDialog(
                             .background(ThemeBackground),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!book.photoPath.isNullOrEmpty() && File(book.photoPath).exists()) {
+                        val photoModel: Any? = if (!book.photoPath.isNullOrEmpty()) {
+                            if (book.photoPath.startsWith("http")) book.photoPath
+                            else {
+                                val file = File(book.photoPath)
+                                if (file.exists()) file else null
+                            }
+                        } else null
+
+                        if (photoModel != null) {
                             AsyncImage(
-                                model = File(book.photoPath),
+                                model = photoModel,
                                 contentDescription = book.title,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
@@ -5047,6 +7150,7 @@ fun LibraryInsightsDialog(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(24.dp)
+                    .verticalScrollWithKeyboard(rememberScrollState())
             ) {
                 // Header of Dialog
                 Row(
@@ -5168,6 +7272,14 @@ fun LibraryInsightsDialog(
                                 }
                             }
                         }
+                    }
+
+                    item {
+                        WeeklyLoanLineChart(loans = loans)
+                    }
+
+                    item {
+                        MostReadGenresBarChart(books = books, loans = loans)
                     }
 
                     // Item 2: Popular Books Top 3
@@ -5568,7 +7680,8 @@ fun PartialReturnDialog(
             Column(
                 modifier = Modifier
                     .padding(20.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .verticalScrollWithKeyboard(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -5706,14 +7819,16 @@ fun ReserveBookDialog(
         if (borrowerName.isBlank()) {
             allBorrowersList.take(4)
         } else {
+            val qNorm = borrowerName.normalizeForSearch()
             allBorrowersList.filter {
-                it.name.lowercase().contains(borrowerName.lowercase())
+                it.name.normalizeForSearch().contains(qNorm)
             }.take(5)
         }
     }
 
     val matchedBorrower = remember(borrowerName, allBorrowersList) {
-        allBorrowersList.find { it.name.trim().lowercase() == borrowerName.trim().lowercase() }
+        val bnNorm = borrowerName.normalizeForSearch()
+        allBorrowersList.find { it.name.normalizeForSearch() == bnNorm }
     }
 
     var dropdownExpanded by remember { mutableStateOf(false) }
@@ -5728,7 +7843,7 @@ fun ReserveBookDialog(
                 modifier = Modifier
                     .padding(20.dp)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScrollWithKeyboard(rememberScrollState())
             ) {
                 Text(
                     text = "Reservar Livro",
@@ -5776,7 +7891,7 @@ fun ReserveBookDialog(
                             shape = RoundedCornerShape(12.dp)
                         )
 
-                        val itemsToShow = if (borrowerName.isBlank()) allBorrowersList else allBorrowersList.filter { it.name.contains(borrowerName, ignoreCase = true) }
+                        val itemsToShow = filteredBorrowers
 
                         if (itemsToShow.isNotEmpty() && dropdownExpanded) {
                             Card(
@@ -5805,11 +7920,11 @@ fun ReserveBookDialog(
                                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Person,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp),
-                                                tint = ThemePurplePrimary
+                                            BorrowerAvatar(
+                                                photoUri = item.photoUri,
+                                                name = item.name,
+                                                size = 20.dp,
+                                                borderWidth = 1.dp
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
@@ -6202,7 +8317,8 @@ fun CarteirinhaDialog(
             Column(
                 modifier = Modifier
                     .padding(20.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .verticalScrollWithKeyboard(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Header of the card body
@@ -6257,21 +8373,12 @@ fun CarteirinhaDialog(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         // User avatar
-                        Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(RoundedCornerShape(36.dp))
-                                .background(Color.White)
-                                .border(1.5.dp, ThemePurplePrimary, RoundedCornerShape(36.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = borrower.name.take(2).uppercase(),
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = ThemePurplePrimary
-                            )
-                        }
+                        BorrowerAvatar(
+                            photoUri = borrower.photoUri,
+                            name = borrower.name,
+                            size = 72.dp,
+                            borderWidth = 1.5.dp
+                        )
 
                         Spacer(modifier = Modifier.height(12.dp))
 
@@ -6435,7 +8542,8 @@ fun FichaEtiquetaDialog(
             Column(
                 modifier = Modifier
                     .padding(20.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .verticalScrollWithKeyboard(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -6730,12 +8838,13 @@ fun ScannerDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(8.dp)
-                .heightIn(max = 620.dp)
+                .heightIn(max = 740.dp)
         ) {
             Column(
                 modifier = Modifier
                     .padding(20.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .verticalScrollWithKeyboard(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Header details
@@ -6752,39 +8861,39 @@ fun ScannerDialog(
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
-                // Laser scope container Box
+                // Laser scope container Box (Câmera Maximizada)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp)
+                        .height(300.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color.Black)
-                        .border(1.5.dp, ThemePurplePrimary, RoundedCornerShape(12.dp)),
+                        .border(2.dp, ThemePurplePrimary, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     // Pulsing green/red scope corners
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val w = size.width
                         val h = size.height
-                        val lineL = 16.dp.toPx()
-                        val strokeW = 3.dp.toPx()
+                        val lineL = 24.dp.toPx()
+                        val strokeW = 4.dp.toPx()
                         val lineC = ThemePurplePrimary
                         
                         // Top-left corner
-                        drawLine(lineC, androidx.compose.ui.geometry.Offset(10.dp.toPx(), 10.dp.toPx()), androidx.compose.ui.geometry.Offset(10.dp.toPx() + lineL, 10.dp.toPx()), strokeW)
-                        drawLine(lineC, androidx.compose.ui.geometry.Offset(10.dp.toPx(), 10.dp.toPx()), androidx.compose.ui.geometry.Offset(10.dp.toPx(), 10.dp.toPx() + lineL), strokeW)
+                        drawLine(lineC, androidx.compose.ui.geometry.Offset(12.dp.toPx(), 12.dp.toPx()), androidx.compose.ui.geometry.Offset(12.dp.toPx() + lineL, 12.dp.toPx()), strokeW)
+                        drawLine(lineC, androidx.compose.ui.geometry.Offset(12.dp.toPx(), 12.dp.toPx()), androidx.compose.ui.geometry.Offset(12.dp.toPx(), 12.dp.toPx() + lineL), strokeW)
                         
                         // Top-right corner
-                        drawLine(lineC, androidx.compose.ui.geometry.Offset(w - 10.dp.toPx(), 10.dp.toPx()), androidx.compose.ui.geometry.Offset(w - 10.dp.toPx() - lineL, 10.dp.toPx()), strokeW)
-                        drawLine(lineC, androidx.compose.ui.geometry.Offset(w - 10.dp.toPx(), 10.dp.toPx()), androidx.compose.ui.geometry.Offset(w - 10.dp.toPx(), 10.dp.toPx() + lineL), strokeW)
+                        drawLine(lineC, androidx.compose.ui.geometry.Offset(w - 12.dp.toPx(), 12.dp.toPx()), androidx.compose.ui.geometry.Offset(w - 12.dp.toPx() - lineL, 12.dp.toPx()), strokeW)
+                        drawLine(lineC, androidx.compose.ui.geometry.Offset(w - 12.dp.toPx(), 12.dp.toPx()), androidx.compose.ui.geometry.Offset(w - 12.dp.toPx(), 12.dp.toPx() + lineL), strokeW)
                         
                         // Bottom-left corner
-                        drawLine(lineC, androidx.compose.ui.geometry.Offset(10.dp.toPx(), h - 10.dp.toPx()), androidx.compose.ui.geometry.Offset(10.dp.toPx() + lineL, h - 10.dp.toPx()), strokeW)
-                        drawLine(lineC, androidx.compose.ui.geometry.Offset(10.dp.toPx(), h - 10.dp.toPx()), androidx.compose.ui.geometry.Offset(10.dp.toPx(), h - 10.dp.toPx() - lineL), strokeW)
+                        drawLine(lineC, androidx.compose.ui.geometry.Offset(12.dp.toPx(), h - 12.dp.toPx()), androidx.compose.ui.geometry.Offset(12.dp.toPx() + lineL, h - 12.dp.toPx()), strokeW)
+                        drawLine(lineC, androidx.compose.ui.geometry.Offset(12.dp.toPx(), h - 12.dp.toPx()), androidx.compose.ui.geometry.Offset(12.dp.toPx(), h - 12.dp.toPx() - lineL), strokeW)
                         
                         // Bottom-right corner
-                        drawLine(lineC, androidx.compose.ui.geometry.Offset(w - 10.dp.toPx(), h - 10.dp.toPx()), androidx.compose.ui.geometry.Offset(w - 10.dp.toPx() - lineL, h - 10.dp.toPx()), strokeW)
-                        drawLine(lineC, androidx.compose.ui.geometry.Offset(w - 10.dp.toPx(), h - 10.dp.toPx()), androidx.compose.ui.geometry.Offset(w - 10.dp.toPx(), h - 10.dp.toPx() - lineL), strokeW)
+                        drawLine(lineC, androidx.compose.ui.geometry.Offset(w - 12.dp.toPx(), h - 12.dp.toPx()), androidx.compose.ui.geometry.Offset(w - 12.dp.toPx() - lineL, h - 12.dp.toPx()), strokeW)
+                        drawLine(lineC, androidx.compose.ui.geometry.Offset(w - 12.dp.toPx(), h - 12.dp.toPx()), androidx.compose.ui.geometry.Offset(w - 12.dp.toPx(), h - 12.dp.toPx() - lineL), strokeW)
                     }
 
                     // Centered targeting HUD text or pulsing details
@@ -6793,18 +8902,37 @@ fun ScannerDialog(
                         color = if (scannedBook != null || scannedBorrower != null) StatusAvailableGreenText else Color.White.copy(alpha = 0.5f),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(top = 40.dp)
                     )
 
-                    // Moving laser horizontal line
+                    // Moving laser horizontal line sweeping down to 300dp
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .fillMaxHeight(0.02f)
+                            .height(2.dp)
                             .align(Alignment.TopCenter)
-                            .offset(y = (laserOffset * 180).dp)
+                            .offset(y = (laserOffset * 300).dp)
                             .background(Color.Red)
                     )
+
+                    // VERY CLEAR INSTRUCTION OVERLAY (DEMANDED BY USER)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 16.dp)
+                            .background(Color(0xFFE6A100).copy(alpha = 0.9f), RoundedCornerShape(8.dp))
+                            .border(1.5.dp, Color.White, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "Aponte a câmera para o código de barras do livro",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -7127,7 +9255,7 @@ fun JtaRoofTab(viewModel: LibraryViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScrollWithKeyboard(rememberScrollState())
             .padding(16.dp)
     ) {
         // Módulo Header
@@ -7184,6 +9312,7 @@ fun JtaRoofTab(viewModel: LibraryViewModel) {
         } else {
             RoofModuleView(viewModel = viewModel, books = books, shelves = shelves, positions = positions)
         }
+        Spacer(modifier = Modifier.height(96.dp))
     }
 }
 
@@ -7474,7 +9603,7 @@ fun JtaModuleView(viewModel: LibraryViewModel, books: List<BookEntity>) {
                             .border(1.dp, ThemeBorder, RoundedCornerShape(8.dp))
                             .padding(10.dp)
                     ) {
-                        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        Column(modifier = Modifier.verticalScrollWithKeyboard(rememberScrollState())) {
                             Text(
                                 text = selectedReportText,
                                 style = androidx.compose.ui.text.TextStyle(
@@ -8121,7 +10250,7 @@ fun RoofModuleView(
                             border = BorderStroke(1.dp, ThemeBorder)
                         ) {
                             val matched = if (queryBook.isBlank()) books.take(8) else books.filter { it.title.contains(queryBook, ignoreCase = true) }.take(8)
-                            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                            Column(modifier = Modifier.verticalScrollWithKeyboard(rememberScrollState())) {
                                 matched.forEach { bk ->
                                     Row(
                                         modifier = Modifier
@@ -8214,7 +10343,7 @@ fun RoofModuleView(
                                 Text("A distribuição coincide exatamente com a demanda de empréstimos física.", color = ThemeSecondaryText, textAlign = TextAlign.Center, fontSize = 11.sp)
                             }
                         } else {
-                            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                            Column(modifier = Modifier.verticalScrollWithKeyboard(rememberScrollState())) {
                                 suggestedRotations.forEach { sugest ->
                                     Card(
                                         modifier = Modifier
@@ -8283,3 +10412,454 @@ fun RoofModuleView(
     }
 }
 
+@Composable
+fun WeeklySuggestionsSection(
+    suggestions: List<WeeklySuggestionEntity>,
+    allBooks: List<BookEntity>,
+    onAddSuggestion: (Int, String, String, String, String, String) -> Unit,
+    onRemoveSuggestion: (WeeklySuggestionEntity) -> Unit
+) {
+    var showAddDialog by remember { mutableStateOf(false) }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF9F7FC)),
+        border = BorderStroke(1.dp, ThemeBorder),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Lightbulb,
+                        contentDescription = null,
+                        tint = ThemePurplePrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Sugestões da Semana pelos Professores",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = ThemePurplePrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Button(
+                    onClick = { showAddDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Indicar Livro", fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (suggestions.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.AutoStories,
+                            contentDescription = null,
+                            tint = ThemeSecondaryText.copy(alpha = 0.5f),
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Nenhuma sugestão cadastrada para esta semana.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = ThemeSecondaryText,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "Clique em \"Indicar Livro\" acima para iniciar uma recomendação para sua turma!",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ThemeSecondaryText.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                        )
+                    }
+                }
+            } else {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    suggestions.forEach { suggestion ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            border = BorderStroke(1.dp, ThemeBorder.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Recomendado para: ${suggestion.classRoom}",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = ThemePurplePrimary,
+                                            modifier = Modifier
+                                                .background(ThemePurpleLight, RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        Text(
+                                            text = recommendationTitleFormat(suggestion.bookTitle),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = ThemeOnBackground,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Autor: ${suggestion.bookAuthor}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = ThemeSecondaryText
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = { onRemoveSuggestion(suggestion) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Remover indicação",
+                                            tint = Color.Red.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFFFCFAFF), RoundedCornerShape(8.dp))
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.FormatQuote,
+                                        contentDescription = null,
+                                        tint = ThemePurplePrimary.copy(alpha = 0.3f),
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .graphicsLayer(scaleY = -1f)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = suggestion.recommendation,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = ThemeOnBackground,
+                                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "— Prof. ${suggestion.professorName}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = ThemePurplePrimary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAddDialog) {
+        AddSuggestionDialog(
+            allBooks = allBooks,
+            onDismiss = { showAddDialog = false },
+            onConfirm = { bookId, title, author, prof, classRm, rec ->
+                onAddSuggestion(bookId, title, author, prof, classRm, rec)
+                showAddDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun AddSuggestionDialog(
+    allBooks: List<BookEntity>,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, String, String, String, String, String) -> Unit
+) {
+    var selectedBookIndex by remember { mutableStateOf(-1) }
+    var professorName by remember { mutableStateOf("") }
+    var classRoom by remember { mutableStateOf("") }
+    var recommendation by remember { mutableStateOf("") }
+    var errorText by remember { mutableStateOf("") }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            border = BorderStroke(1.dp, ThemeBorder),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .fillMaxWidth()
+                    .verticalScrollWithKeyboard(rememberScrollState())
+            ) {
+                Text(
+                    text = "Indicar Livro da Semana",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = ThemePurplePrimary,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Book Selector Field
+                Text("Livro Indicado *", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = ThemeOnBackground)
+                Spacer(modifier = Modifier.height(6.dp))
+                
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { dropdownExpanded = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, ThemePurplePrimary)
+                    ) {
+                        val displayText = if (selectedBookIndex != -1 && selectedBookIndex < allBooks.size) {
+                            allBooks[selectedBookIndex].title
+                        } else {
+                            "Selecione um livro do acervo..."
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(displayText, color = ThemeOnBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = ThemePurplePrimary)
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false },
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .heightIn(max = 250.dp)
+                    ) {
+                        if (allBooks.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("Nenhum livro no acervo cadastrado.") },
+                                onClick = { dropdownExpanded = false }
+                            )
+                        } else {
+                            allBooks.forEachIndexed { index, book ->
+                                DropdownMenuItem(
+                                    text = { Text("${book.title} (de ${book.author})") },
+                                    onClick = {
+                                        selectedBookIndex = index
+                                        dropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Professor Name
+                OutlinedTextField(
+                    value = professorName,
+                    onValueChange = { professorName = it },
+                    label = { Text("Nome do Professor *") },
+                    placeholder = { Text("Ex: Carlos Silva ou Profª Ana Maria") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ThemePurplePrimary,
+                        focusedLabelColor = ThemePurplePrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Class/Turma
+                OutlinedTextField(
+                    value = classRoom,
+                    onValueChange = { classRoom = it },
+                    label = { Text("Turma / Série Alvo *") },
+                    placeholder = { Text("Ex: 9º Ano B ou 3º Colegial C") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ThemePurplePrimary,
+                        focusedLabelColor = ThemePurplePrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Recommendation text
+                OutlinedTextField(
+                    value = recommendation,
+                    onValueChange = { recommendation = it },
+                    label = { Text("Recomendação / Justificativa *") },
+                    placeholder = { Text("Por que este livro é indicado para esta turma neste momento? Escreva uma breve mensagem inspiradora.") },
+                    minLines = 3,
+                    maxLines = 5,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ThemePurplePrimary,
+                        focusedLabelColor = ThemePurplePrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                if (errorText.isNotEmpty()) {
+                    Text(
+                        text = errorText,
+                        color = Color.Red,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 10.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancelar", color = ThemeSecondaryText)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (selectedBookIndex == -1 || professorName.isBlank() || classRoom.isBlank() || recommendation.isBlank()) {
+                                errorText = "Por favor, preencha todos os campos obrigatórios (*)"
+                            } else {
+                                val book = allBooks[selectedBookIndex]
+                                onConfirm(book.id, book.title, book.author, professorName.trim(), classRoom.trim(), recommendation.trim())
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Salvar Indicação")
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun recommendationTitleFormat(title: String): String {
+    return if (title.length > 50) title.take(47) + "..." else title
+}
+
+
+@Composable
+fun Modifier.verticalScrollWithKeyboard(state: ScrollState): Modifier {
+    val coroutineScope = rememberCoroutineScope()
+    return this
+        .verticalScroll(state)
+        .focusable()
+        .onKeyEvent { event ->
+            if (event.type == KeyEventType.KeyDown) {
+                when (event.key) {
+                    Key.DirectionDown -> { coroutineScope.launch { state.scrollBy(150f) }; true }
+                    Key.DirectionUp -> { coroutineScope.launch { state.scrollBy(-150f) }; true }
+                    Key.PageDown -> { coroutineScope.launch { state.scrollBy(500f) }; true }
+                    Key.PageUp -> { coroutineScope.launch { state.scrollBy(-500f) }; true }
+                    else -> false
+                }
+            } else {
+                false
+            }
+        }
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    if (event.type == PointerEventType.Scroll) {
+                        val delta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                        if (delta != 0f) {
+                            coroutineScope.launch {
+                                state.scrollBy(delta * 100f)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+}
+
+@Composable
+fun Modifier.horizontalScrollWithKeyboard(state: ScrollState): Modifier {
+    val coroutineScope = rememberCoroutineScope()
+    return this
+        .horizontalScroll(state)
+        .focusable()
+        .onKeyEvent { event ->
+            if (event.type == KeyEventType.KeyDown) {
+                when (event.key) {
+                    Key.DirectionRight -> { coroutineScope.launch { state.scrollBy(150f) }; true }
+                    Key.DirectionLeft -> { coroutineScope.launch { state.scrollBy(-150f) }; true }
+                    else -> false
+                }
+            } else {
+                false
+            }
+        }
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    if (event.type == PointerEventType.Scroll) {
+                        val delta = event.changes.firstOrNull()?.scrollDelta?.x ?: (event.changes.firstOrNull()?.scrollDelta?.y ?: 0f)
+                        if (delta != 0f) {
+                            coroutineScope.launch {
+                                state.scrollBy(delta * 100f)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+}

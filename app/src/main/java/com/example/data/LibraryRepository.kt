@@ -10,6 +10,7 @@ class LibraryRepository(private val database: AppDatabase) {
     private val borrowerDao = database.borrowerDao()
     private val reservationDao = database.reservationDao()
     private val shelfDao = database.shelfDao()
+    private val weeklySuggestionDao = database.weeklySuggestionDao()
 
     // --- Borrower Operations ---
     val allBorrowers: Flow<List<BorrowerEntity>> = borrowerDao.getAllBorrowers()
@@ -76,8 +77,9 @@ class LibraryRepository(private val database: AppDatabase) {
             return false // Not enough copies available to loan
         }
 
-        // Create the loan with dynamic period (15 days for Prof, 7 days for Aluno)
-        val defaultDays = if (borrowerClass.startsWith("Prof", ignoreCase = true)) 15L else 7L
+        val studentLoanDays = configDao.getConfig("student_loan_days")?.value?.toLongOrNull() ?: 7L
+        val teacherLoanDays = configDao.getConfig("teacher_loan_days")?.value?.toLongOrNull() ?: 15L
+        val defaultDays = if (borrowerClass.startsWith("Prof", ignoreCase = true)) teacherLoanDays else studentLoanDays
         val dueDate = loanDate + (defaultDays * 24 * 60 * 60 * 1000)
         val loan = LoanEntity(
             bookId = bookId,
@@ -206,6 +208,70 @@ class LibraryRepository(private val database: AppDatabase) {
         configDao.insertConfig(ConfigEntity("master_password", password))
     }
 
+    suspend fun getUserEmail(): String? {
+        return configDao.getConfig("user_email")?.value
+    }
+
+    suspend fun setUserEmail(email: String) {
+        configDao.insertConfig(ConfigEntity("user_email", email))
+    }
+
+    suspend fun getUserPassword(): String? {
+        return configDao.getConfig("user_password")?.value
+    }
+
+    suspend fun setUserPassword(password: String) {
+        configDao.insertConfig(ConfigEntity("user_password", password))
+    }
+
+    suspend fun getUserName(): String? {
+        return configDao.getConfig("user_name")?.value
+    }
+
+    suspend fun setUserName(name: String) {
+        configDao.insertConfig(ConfigEntity("user_name", name))
+    }
+
+    suspend fun getUserPhotoUrl(): String? {
+        return configDao.getConfig("user_photo_url")?.value
+    }
+
+    suspend fun setUserPhotoUrl(url: String) {
+        configDao.insertConfig(ConfigEntity("user_photo_url", url))
+    }
+
+    suspend fun getLoginMethod(): String? {
+        return configDao.getConfig("login_method")?.value
+    }
+
+    suspend fun setLoginMethod(method: String) {
+        configDao.insertConfig(ConfigEntity("login_method", method))
+    }
+
+    suspend fun getGoogleEmail(): String? {
+        return configDao.getConfig("google_email")?.value
+    }
+
+    suspend fun setGoogleEmail(email: String) {
+        configDao.insertConfig(ConfigEntity("google_email", email))
+    }
+
+    suspend fun getStudentLoanDays(): Long {
+        return configDao.getConfig("student_loan_days")?.value?.toLongOrNull() ?: 7L
+    }
+
+    suspend fun setStudentLoanDays(days: Long) {
+        configDao.insertConfig(ConfigEntity("student_loan_days", days.toString()))
+    }
+
+    suspend fun getTeacherLoanDays(): Long {
+        return configDao.getConfig("teacher_loan_days")?.value?.toLongOrNull() ?: 15L
+    }
+
+    suspend fun setTeacherLoanDays(days: Long) {
+        configDao.insertConfig(ConfigEntity("teacher_loan_days", days.toString()))
+    }
+
     // --- Reservation Operations ---
     val allReservations: Flow<List<ReservationEntity>> = reservationDao.getAllReservations()
 
@@ -275,5 +341,16 @@ class LibraryRepository(private val database: AppDatabase) {
 
     suspend fun deletePosition(position: ShelfPositionEntity) {
         shelfDao.deletePosition(position)
+    }
+
+    // --- Weekly Suggestions Operations ---
+    val allSuggestions: Flow<List<WeeklySuggestionEntity>> = weeklySuggestionDao.getAllSuggestions()
+
+    suspend fun insertSuggestion(suggestion: WeeklySuggestionEntity): Long {
+        return weeklySuggestionDao.insertSuggestion(suggestion)
+    }
+
+    suspend fun deleteSuggestion(suggestion: WeeklySuggestionEntity) {
+        weeklySuggestionDao.deleteSuggestion(suggestion)
     }
 }

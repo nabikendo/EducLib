@@ -6,18 +6,98 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.text.Normalizer
+import java.util.regex.Pattern
+
+private val DIACRITICS_PATTERN = Pattern.compile("\\p{InCombiningDiacriticalMarks}+")
+private val WHITESPACE_REGEX = Regex("\\s+")
+
+fun String.normalizeForSearch(): String {
+    val temp = Normalizer.normalize(this, Normalizer.Form.NFD)
+    return DIACRITICS_PATTERN.matcher(temp).replaceAll("").lowercase().trim()
+}
+
+fun calculateLevenshteinDistance(s: String, t: String): Int {
+    if (s == t) return 0
+    if (s.isEmpty()) return t.length
+    if (t.isEmpty()) return s.length
+    val d = IntArray(t.length + 1) { it }
+    for (i in 1..s.length) {
+        var prev = i
+        var old = d[0]
+        d[0] = i
+        for (j in 1..t.length) {
+            val cost = if (s[i - 1] == t[j - 1]) 0 else 1
+            val temp = d[j]
+            d[j] = minOf(d[j] + 1, prev + 1, old + cost)
+            old = temp
+            prev = d[j]
+        }
+    }
+    return d[t.length]
+}
+
+fun isWordFuzzyMatch(qWord: String, tWord: String): Boolean {
+    if (tWord.contains(qWord) || qWord.contains(tWord)) return true
+    val lenDiff = Math.abs(qWord.length - tWord.length)
+    val maxAllowed = when {
+        qWord.length <= 3 -> 0
+        qWord.length <= 6 -> 1
+        else -> 2
+    }
+    if (lenDiff > maxAllowed) return false
+    val dist = calculateLevenshteinDistance(qWord, tWord)
+    return dist <= maxAllowed
+}
+
+fun isFuzzyMatch(query: String, target: String): Boolean {
+    val qNorm = query.normalizeForSearch()
+    if (qNorm.isEmpty()) return true
+    val targetNorm = target.normalizeForSearch()
+    if (targetNorm.contains(qNorm)) return true
+    
+    val queryWords = qNorm.split(WHITESPACE_REGEX).filter { it.isNotBlank() }
+    if (queryWords.isEmpty()) return true
+    val targetWords = targetNorm.split(WHITESPACE_REGEX).filter { it.isNotBlank() }
+    
+    // Each query word must fuzzy-match at least one target word
+    return queryWords.all { qWord ->
+        targetWords.any { tWord ->
+            isWordFuzzyMatch(qWord, tWord)
+        }
+    }
+}
 
 class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() {
 
-    // Login/Security states (disabled since app is exclusive, set to true by default)
-    private val _isPasswordSet = MutableStateFlow<Boolean?>(true)
+    private val _studentLoanDays = MutableStateFlow(7L)
+    val studentLoanDays: StateFlow<Long> = _studentLoanDays.asStateFlow()
+
+    private val _teacherLoanDays = MutableStateFlow(15L)
+    val teacherLoanDays: StateFlow<Long> = _teacherLoanDays.asStateFlow()
+
+    // Login/Security states (restored proper secure startup flow)
+    private val _isPasswordSet = MutableStateFlow<Boolean?>(null)
     val isPasswordSet: StateFlow<Boolean?> = _isPasswordSet.asStateFlow()
 
-    private val _isLoggedIn = MutableStateFlow(true)
+    private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
+
+    private val _userEmail = MutableStateFlow<String?>(null)
+    val userEmail: StateFlow<String?> = _userEmail.asStateFlow()
+
+    private val _userName = MutableStateFlow<String?>(null)
+    val userName: StateFlow<String?> = _userName.asStateFlow()
+
+    private val _userPhotoUrl = MutableStateFlow<String?>(null)
+    val userPhotoUrl: StateFlow<String?> = _userPhotoUrl.asStateFlow()
+
+    private val _loginMethod = MutableStateFlow<String?>(null)
+    val loginMethod: StateFlow<String?> = _loginMethod.asStateFlow()
 
     // Search query
     private val _searchQuery = MutableStateFlow("")
@@ -27,27 +107,58 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
     val borrowerSearchQuery: StateFlow<String> = _borrowerSearchQuery.asStateFlow()
 
     // Reactive lists from Database
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val books: StateFlow<List<BookEntity>> = _searchQuery
-        .flatMapLatest { query ->
-            if (query.isBlank()) {
-                repository.allBooks
-            } else {
-                repository.searchBooks(query)
+    val books: StateFlow<List<BookEntity>> = combine(
+        repository.allBooks,
+        repository.allShelves,
+        repository.allPositionsFlow,
+        _searchQuery
+    ) { allBooks, allShelves, allPositions, query ->
+        if (query.isBlank()) {
+            allBooks
+        } else {
+            allBooks.filter { book ->
+                val titleMatch = isFuzzyMatch(query, book.title)
+                val authorMatch = isFuzzyMatch(query, book.author)
+                val genreMatch = isFuzzyMatch(query, book.genre)
+                val locationMatch = isFuzzyMatch(query, book.location)
+                
+                var shelfMatch = false
+                var coordMatch = false
+                if (book.posicaoEstanteId != null) {
+                    val position = allPositions.find { it.id == book.posicaoEstanteId }
+                    if (position != null) {
+                        coordMatch = isFuzzyMatch(query, position.coordinate)
+                        val shelf = allShelves.find { it.id == position.shelfId }
+                        if (shelf != null) {
+                            shelfMatch = isFuzzyMatch(query, shelf.name)
+                        }
+                    }
+                }
+                
+                titleMatch || authorMatch || genreMatch || locationMatch || shelfMatch || coordMatch
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }
+    .flowOn(Dispatchers.Default)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val borrowers: StateFlow<List<BorrowerEntity>> = _borrowerSearchQuery
-        .flatMapLatest { query ->
-            if (query.isBlank()) {
-                repository.allBorrowers
-            } else {
-                repository.searchBorrowers(query)
+    val borrowers: StateFlow<List<BorrowerEntity>> = combine(
+        repository.allBorrowers,
+        _borrowerSearchQuery
+    ) { all, query ->
+        if (query.isBlank()) {
+            all
+        } else {
+            all.filter { borrower ->
+                isFuzzyMatch(query, borrower.name) ||
+                isFuzzyMatch(query, borrower.identifier) ||
+                isFuzzyMatch(query, borrower.classRoom) ||
+                isFuzzyMatch(query, borrower.type)
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }
+    .flowOn(Dispatchers.Default)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allBorrowers: StateFlow<List<BorrowerEntity>> = repository.allBorrowers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -67,8 +178,15 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
     val positions: StateFlow<List<ShelfPositionEntity>> = repository.allPositionsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val suggestions: StateFlow<List<WeeklySuggestionEntity>> = repository.allSuggestions
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         checkIfPasswordConfigured()
+        viewModelScope.launch {
+            _studentLoanDays.value = repository.getStudentLoanDays()
+            _teacherLoanDays.value = repository.getTeacherLoanDays()
+        }
         // Save automatic backup whenever books or loans change
         viewModelScope.launch {
             combine(books, loans) { b, l -> Pair(b, l) }
@@ -80,13 +198,69 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
     }
 
     private fun checkIfPasswordConfigured() {
-        _isPasswordSet.value = true
+        viewModelScope.launch {
+            val masterPassword = repository.getMasterPassword()
+            val userEmail = repository.getUserEmail()
+            val userPassword = repository.getUserPassword()
+            val googleEmail = repository.getGoogleEmail()
+
+            val hasConfig = !masterPassword.isNullOrBlank() || 
+                             (!userEmail.isNullOrBlank() && !userPassword.isNullOrBlank()) || 
+                             !googleEmail.isNullOrBlank()
+            
+            _isPasswordSet.value = hasConfig
+
+            if (hasConfig) {
+                _userEmail.value = repository.getUserEmail() ?: repository.getGoogleEmail()
+                _userName.value = repository.getUserName() ?: ""
+                _userPhotoUrl.value = repository.getUserPhotoUrl() ?: ""
+                _loginMethod.value = repository.getLoginMethod() ?: "master_password"
+            }
+        }
     }
 
     fun registerMasterPassword(password: String) {
         viewModelScope.launch {
             if (password.isNotBlank()) {
                 repository.setMasterPassword(password)
+                repository.setLoginMethod("master_password")
+                _isPasswordSet.value = true
+                _isLoggedIn.value = true
+                _loginMethod.value = "master_password"
+                _userName.value = "Administrador"
+            }
+        }
+    }
+
+    fun registerEmailAndPassword(email: String, password: String, name: String) {
+        viewModelScope.launch {
+            if (email.isNotBlank() && password.isNotBlank()) {
+                repository.setUserEmail(email)
+                repository.setUserPassword(password)
+                repository.setUserName(name)
+                repository.setLoginMethod("email")
+                
+                _userEmail.value = email
+                _userName.value = name
+                _loginMethod.value = "email"
+                _isPasswordSet.value = true
+                _isLoggedIn.value = true
+            }
+        }
+    }
+
+    fun registerViaGoogle(email: String, name: String, photoUrl: String?) {
+        viewModelScope.launch {
+            if (email.isNotBlank()) {
+                repository.setGoogleEmail(email)
+                repository.setUserName(name)
+                repository.setUserPhotoUrl(photoUrl ?: "")
+                repository.setLoginMethod("google")
+                
+                _userEmail.value = email
+                _userName.value = name
+                _userPhotoUrl.value = photoUrl ?: ""
+                _loginMethod.value = "google"
                 _isPasswordSet.value = true
                 _isLoggedIn.value = true
             }
@@ -95,18 +269,70 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
 
     suspend fun login(password: String): Boolean {
         val pw = repository.getMasterPassword()
-        return if (pw == password) {
+        val userPw = repository.getUserPassword()
+        return if ((!pw.isNullOrBlank() && pw == password) || (!userPw.isNullOrBlank() && userPw == password)) {
             _isLoggedIn.value = true
+            _loginMethod.value = if (!userPw.isNullOrBlank() && userPw == password) "email" else "master_password"
+            repository.setLoginMethod(_loginMethod.value ?: "master_password")
             true
         } else {
             false
         }
     }
 
+    suspend fun loginWithEmail(email: String, password: String): Boolean {
+        val userEmail = repository.getUserEmail()
+        val userPw = repository.getUserPassword()
+        return if (!userEmail.isNullOrBlank() && userEmail.equals(email, ignoreCase = true) && !userPw.isNullOrBlank() && userPw == password) {
+            _isLoggedIn.value = true
+            _userEmail.value = userEmail
+            _userName.value = repository.getUserName() ?: ""
+            _loginMethod.value = "email"
+            repository.setLoginMethod("email")
+            true
+        } else {
+            // Support fallback to master password if they input email and password
+            val masterPassword = repository.getMasterPassword()
+            if (!masterPassword.isNullOrBlank() && email.contains("@") && masterPassword == password) {
+                repository.setUserEmail(email)
+                repository.setUserPassword(password)
+                repository.setUserName("Administrador")
+                repository.setLoginMethod("email")
+                
+                _isLoggedIn.value = true
+                _userEmail.value = email
+                _userName.value = "Administrador"
+                _loginMethod.value = "email"
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    suspend fun loginWithGoogle(email: String, name: String, photoUrl: String?): Boolean {
+        repository.setGoogleEmail(email)
+        repository.setUserName(name)
+        repository.setUserPhotoUrl(photoUrl ?: "")
+        repository.setLoginMethod("google")
+        
+        _isLoggedIn.value = true
+        _userEmail.value = email
+        _userName.value = name
+        _userPhotoUrl.value = photoUrl ?: ""
+        _loginMethod.value = "google"
+        _isPasswordSet.value = true
+        return true
+    }
+
     suspend fun changePassword(oldPw: String, newPw: String): Boolean {
         val pw = repository.getMasterPassword()
-        return if (pw == oldPw && newPw.isNotBlank()) {
+        val userPw = repository.getUserPassword()
+        return if (!pw.isNullOrBlank() && pw == oldPw && newPw.isNotBlank()) {
             repository.setMasterPassword(newPw)
+            true
+        } else if (!userPw.isNullOrBlank() && userPw == oldPw && newPw.isNotBlank()) {
+            repository.setUserPassword(newPw)
             true
         } else {
             false
@@ -131,7 +357,8 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
         type: String, // "Aluno" or "Professor"
         identifier: String,
         phone: String,
-        classRoom: String = ""
+        classRoom: String = "",
+        photoUri: String? = null
     ) {
         viewModelScope.launch {
             val borrower = BorrowerEntity(
@@ -139,7 +366,8 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
                 type = type,
                 identifier = identifier,
                 phone = phone,
-                classRoom = classRoom
+                classRoom = classRoom,
+                photoUri = photoUri
             )
             repository.insertBorrower(borrower)
             triggerAutoBackup(context)
@@ -153,7 +381,8 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
         type: String,
         identifier: String,
         phone: String,
-        classRoom: String = ""
+        classRoom: String = "",
+        photoUri: String? = null
     ) {
         viewModelScope.launch {
             val updated = borrower.copy(
@@ -161,7 +390,8 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
                 type = type,
                 identifier = identifier,
                 phone = phone,
-                classRoom = classRoom
+                classRoom = classRoom,
+                photoUri = photoUri
             )
             repository.updateBorrower(updated)
             triggerAutoBackup(context)
@@ -183,11 +413,68 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
         }
     }
 
+    fun updateBorrowerPhone(context: Context, borrowerName: String, phoneStr: String) {
+        viewModelScope.launch {
+            val borrower = allBorrowers.value.find { it.name.trim().equals(borrowerName.trim(), ignoreCase = true) }
+            if (borrower != null) {
+                val updated = borrower.copy(phone = phoneStr)
+                repository.updateBorrower(updated)
+                triggerAutoBackup(context)
+            }
+        }
+    }
+
+    // --- Weekly Suggestions Operations ---
+    fun addSuggestion(
+        context: Context,
+        bookId: Int,
+        bookTitle: String,
+        bookAuthor: String,
+        professorName: String,
+        classRoom: String,
+        recommendation: String
+    ) {
+        viewModelScope.launch {
+            val suggestion = WeeklySuggestionEntity(
+                bookId = bookId,
+                bookTitle = bookTitle,
+                bookAuthor = bookAuthor,
+                professorName = professorName,
+                classRoom = classRoom,
+                recommendation = recommendation
+            )
+            repository.insertSuggestion(suggestion)
+            triggerAutoBackup(context)
+        }
+    }
+
+    fun removeSuggestion(context: Context, suggestion: WeeklySuggestionEntity) {
+        viewModelScope.launch {
+            repository.deleteSuggestion(suggestion)
+            triggerAutoBackup(context)
+        }
+    }
+
+    fun setStudentLoanDays(days: Long) {
+        viewModelScope.launch {
+            repository.setStudentLoanDays(days)
+            _studentLoanDays.value = days
+        }
+    }
+
+    fun setTeacherLoanDays(days: Long) {
+        viewModelScope.launch {
+            repository.setTeacherLoanDays(days)
+            _teacherLoanDays.value = days
+        }
+    }
+
     // --- Book Operations ---
     fun addBook(
         context: Context,
         title: String,
         author: String,
+        isbn: String,
         genre: String,
         year: Int,
         location: String,
@@ -198,6 +485,7 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
             val book = BookEntity(
                 title = title,
                 author = author,
+                isbn = isbn,
                 genre = genre,
                 year = year,
                 location = location,
@@ -215,6 +503,7 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
         book: BookEntity,
         title: String,
         author: String,
+        isbn: String,
         genre: String,
         year: Int,
         location: String,
@@ -229,6 +518,7 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
             val updated = book.copy(
                 title = title,
                 author = author,
+                isbn = isbn,
                 genre = genre,
                 year = year,
                 location = location,
@@ -335,7 +625,7 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
 
     // --- Backup & Restore ---
     fun triggerAutoBackup(context: Context) {
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             BackupManager.saveAutoBackup(context, books.value, loans.value)
         }
     }
@@ -348,129 +638,127 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
         return BackupManager.getShareBooksCsvIntent(context, books.value)
     }
 
+    fun exportBackupToJson(): String {
+        return BackupManager.toJson(books.value, loans.value)
+    }
+
     fun restoreBackup(context: Context, jsonString: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
-            val payload = BackupManager.fromJson(jsonString)
-            if (payload == null) {
-                onResult(false)
-                return@launch
-            }
+            val success = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val payload = BackupManager.fromJson(jsonString) ?: return@withContext false
+                try {
+                    val db = AppDatabase.getDatabase(context)
+                    db.clearAllTables()
 
-            try {
-                // To be robust, clear existing data and insert backup
-                val db = AppDatabase.getDatabase(context)
-                db.clearAllTables()
+                    payload.books?.forEach { book ->
+                        repository.insertBook(book)
+                    }
 
-                payload.books?.forEach { book ->
-                    // Re-insert safely
-                    repository.insertBook(book)
-                }
-
-                payload.loans?.forEach { loan ->
-                    // Re-insert safely
-                    repository.createLoan(
-                        bookId = loan.bookId,
-                        borrowerName = loan.borrowerName,
-                        borrowerClass = loan.borrowerClass,
-                        loanDate = loan.loanDate
-                    ).let { success ->
-                        // If it is already marked returned, we update it to preserve status
-                        if (loan.returnDate != null) {
-                            // Find the newly inserted loan and update returnDate
-                            val allNewLoans = repository.allLoans.first()
-                            val inserted = allNewLoans.firstOrNull {
-                                it.bookId == loan.bookId &&
-                                it.borrowerName == loan.borrowerName &&
-                                it.loanDate == loan.loanDate
-                            }
-                            if (inserted != null) {
-                                repository.returnLoan(inserted.id, returnDate = loan.returnDate ?: System.currentTimeMillis())
+                    payload.loans?.forEach { loan ->
+                        repository.createLoan(
+                            bookId = loan.bookId,
+                            borrowerName = loan.borrowerName,
+                            borrowerClass = loan.borrowerClass,
+                            loanDate = loan.loanDate
+                        ).let {
+                            if (loan.returnDate != null) {
+                                val allNewLoans = repository.allLoans.first()
+                                val inserted = allNewLoans.firstOrNull {
+                                    it.bookId == loan.bookId &&
+                                    it.borrowerName == loan.borrowerName &&
+                                    it.loanDate == loan.loanDate
+                                }
+                                if (inserted != null) {
+                                    repository.returnLoan(inserted.id, returnDate = loan.returnDate ?: System.currentTimeMillis())
+                                }
                             }
                         }
                     }
+                    true
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    false
                 }
-                
-                onResult(true)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                onResult(false)
             }
+            onResult(success)
         }
     }
 
     fun importBooksFromCsv(context: Context, csvString: String, onResult: (Boolean, Int) -> Unit) {
         viewModelScope.launch {
-            try {
-                val lines = csvString.split('\n')
-                if (lines.isEmpty()) {
-                    onResult(false, 0)
-                    return@launch
+            val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val lines = csvString.split('\n')
+                    if (lines.isEmpty()) {
+                        return@withContext Pair(false, 0)
+                    }
+
+                    val firstLine = lines.firstOrNull() ?: ""
+                    val headers = parseCsvLine(firstLine).map { it.trim().lowercase() }
+
+                    var titleIdx = headers.indexOfFirst { it.contains("titulo") || it.contains("título") || it == "title" }
+                    var authorIdx = headers.indexOfFirst { it.contains("autor") || it == "author" }
+                    var genreIdx = headers.indexOfFirst { it.contains("genero") || it.contains("gênero") || it == "genre" }
+                    var yearIdx = headers.indexOfFirst { it.contains("ano") || it == "year" }
+                    var quantityIdx = headers.indexOfFirst { it.contains("quantidade") || it.contains("qtd") || it.contains("quantity") || it == "total" || it.contains("total") }
+                    var locationIdx = headers.indexOfFirst { it.contains("localizacao") || it.contains("localização") || it == "location" }
+
+                    if (titleIdx == -1 && authorIdx == -1) {
+                        titleIdx = 0
+                        authorIdx = 1
+                        genreIdx = 2
+                        yearIdx = 3
+                        quantityIdx = 4
+                        locationIdx = 5
+                    }
+
+                    var importCount = 0
+                    val startRow = if (headers.any { it.contains("titulo") || it.contains("título") || it == "title" || it == "autor" || it == "author" }) 1 else 0
+
+                    for (i in startRow until lines.size) {
+                        val line = lines[i]
+                        if (line.isBlank()) continue
+                        val columns = parseCsvLine(line)
+                        if (columns.size <= maxOf(titleIdx, authorIdx)) continue
+
+                        val title = columns.getOrNull(titleIdx)?.trim()?.removeSurrounding("\"")?.ifBlank { null }
+                        val author = columns.getOrNull(authorIdx)?.trim()?.removeSurrounding("\"")?.ifBlank { null }
+
+                        if (title == null || author == null) continue
+
+                        val genre = if (genreIdx != -1) columns.getOrNull(genreIdx)?.trim()?.removeSurrounding("\"")?.ifBlank { "Outros" } ?: "Outros" else "Outros"
+                        val yearStr = if (yearIdx != -1) columns.getOrNull(yearIdx)?.trim()?.removeSurrounding("\"") else null
+                        val year = yearStr?.toIntOrNull() ?: java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+                        val qtyStr = if (quantityIdx != -1) columns.getOrNull(quantityIdx)?.trim()?.removeSurrounding("\"") else null
+                        val totalQty = qtyStr?.toIntOrNull() ?: 1
+                        val location = if (locationIdx != -1) columns.getOrNull(locationIdx)?.trim()?.removeSurrounding("\"")?.ifBlank { "Geral" } ?: "Geral" else "Geral"
+
+                        val book = com.example.data.BookEntity(
+                            title = title,
+                            author = author,
+                            genre = genre,
+                            year = year,
+                            location = location,
+                            photoPath = null,
+                            totalQuantity = totalQty,
+                            availableQuantity = totalQty
+                        )
+                        repository.insertBook(book)
+                        importCount++
+                    }
+
+                    if (importCount > 0) {
+                        triggerAutoBackup(context)
+                        Pair(true, importCount)
+                    } else {
+                        Pair(false, 0)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    Pair(false, 0)
                 }
-
-                val firstLine = lines.firstOrNull() ?: ""
-                val headers = parseCsvLine(firstLine).map { it.trim().lowercase() }
-
-                var titleIdx = headers.indexOfFirst { it.contains("titulo") || it.contains("título") || it == "title" }
-                var authorIdx = headers.indexOfFirst { it.contains("autor") || it == "author" }
-                var genreIdx = headers.indexOfFirst { it.contains("genero") || it.contains("gênero") || it == "genre" }
-                var yearIdx = headers.indexOfFirst { it.contains("ano") || it == "year" }
-                var quantityIdx = headers.indexOfFirst { it.contains("quantidade") || it.contains("qtd") || it.contains("quantity") || it == "total" || it.contains("total") }
-                var locationIdx = headers.indexOfFirst { it.contains("localizacao") || it.contains("localização") || it == "location" }
-
-                if (titleIdx == -1 && authorIdx == -1) {
-                    titleIdx = 0
-                    authorIdx = 1
-                    genreIdx = 2
-                    yearIdx = 3
-                    quantityIdx = 4
-                    locationIdx = 5
-                }
-
-                var importCount = 0
-                val startRow = if (headers.any { it.contains("titulo") || it.contains("título") || it == "title" || it == "autor" || it == "author" }) 1 else 0
-
-                for (i in startRow until lines.size) {
-                    val line = lines[i]
-                    if (line.isBlank()) continue
-                    val columns = parseCsvLine(line)
-                    if (columns.size <= maxOf(titleIdx, authorIdx)) continue
-
-                    val title = columns.getOrNull(titleIdx)?.trim()?.removeSurrounding("\"")?.ifBlank { null }
-                    val author = columns.getOrNull(authorIdx)?.trim()?.removeSurrounding("\"")?.ifBlank { null }
-
-                    if (title == null || author == null) continue
-
-                    val genre = if (genreIdx != -1) columns.getOrNull(genreIdx)?.trim()?.removeSurrounding("\"")?.ifBlank { "Outros" } ?: "Outros" else "Outros"
-                    val yearStr = if (yearIdx != -1) columns.getOrNull(yearIdx)?.trim()?.removeSurrounding("\"") else null
-                    val year = yearStr?.toIntOrNull() ?: java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-                    val qtyStr = if (quantityIdx != -1) columns.getOrNull(quantityIdx)?.trim()?.removeSurrounding("\"") else null
-                    val totalQty = qtyStr?.toIntOrNull() ?: 1
-                    val location = if (locationIdx != -1) columns.getOrNull(locationIdx)?.trim()?.removeSurrounding("\"")?.ifBlank { "Geral" } ?: "Geral" else "Geral"
-
-                    val book = com.example.data.BookEntity(
-                        title = title,
-                        author = author,
-                        genre = genre,
-                        year = year,
-                        location = location,
-                        photoPath = null,
-                        totalQuantity = totalQty,
-                        availableQuantity = totalQty
-                    )
-                    repository.insertBook(book)
-                    importCount++
-                }
-
-                if (importCount > 0) {
-                    triggerAutoBackup(context)
-                    onResult(true, importCount)
-                } else {
-                    onResult(false, 0)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                onResult(false, 0)
             }
+            onResult(result.first, result.second)
         }
     }
 

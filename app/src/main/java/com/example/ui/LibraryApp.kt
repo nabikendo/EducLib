@@ -1096,6 +1096,18 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
         } else {
             // Mobile portrait layout: normal layout with bottom navigation bar
             Scaffold(
+                floatingActionButton = {
+                    if (selectedTab == 0 && !isAddingBookRoute && bookToEdit == null) {
+                        ExtendedFloatingActionButton(
+                            onClick = { isAddingBookRoute = true },
+                            containerColor = ThemePurplePrimary,
+                            contentColor = Color.White,
+                            icon = { Icon(Icons.Default.Add, contentDescription = "Adicionar Livro") },
+                            text = { Text("Adicionar Livro") },
+                            modifier = Modifier.testTag("fab_add_book")
+                        )
+                    }
+                },
                 bottomBar = {
                     NavigationBar(
                         containerColor = ThemePurpleLight,
@@ -1737,15 +1749,16 @@ fun CatalogTab(
         GridCells.Fixed(1)
     }
 
-    LazyVerticalGrid(
-        columns = gridCells,
-        contentPadding = PaddingValues(bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 20.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = gridCells,
+            contentPadding = PaddingValues(bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 20.dp)
+        ) {
         // 1. Header Details
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
             val isTablet = LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600
@@ -1840,20 +1853,18 @@ fun CatalogTab(
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Button(
                             onClick = onAddBookClick,
                             colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .weight(1.2f)
-                                .testTag("add_book_button_header")
+                            modifier = Modifier.testTag("add_book_button_header")
                         ) {
                             Icon(Icons.Default.Add, contentDescription = "Novo Livro", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Adicionar", fontSize = 12.sp)
+                            Text("Adicionar Livro", fontSize = 12.sp)
                         }
                     }
                 }
@@ -2082,9 +2093,13 @@ fun CatalogTab(
                         } else null
                     } else null
                 }
+                val isOverdue = remember(loans, book.id) {
+                    loans.any { it.bookId == book.id && it.returnDate == null && it.calculatedIsOverdue() }
+                }
                 BookCard(
                     book = book,
                     shelfLocationText = shelfLocationText,
+                    isOverdue = isOverdue,
                     onEdit = { onEditBookClick(book) },
                     onDelete = {
                         AlertDialogHelper.showConfirmDialog(
@@ -2099,6 +2114,7 @@ fun CatalogTab(
                 )
             }
         }
+    }
     }
 
     // Loan Dialog Trigger
@@ -2165,6 +2181,7 @@ fun CatalogTab(
 fun BookCard(
     book: BookEntity,
     shelfLocationText: String? = null,
+    isOverdue: Boolean = false,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onLoan: () -> Unit,
@@ -2325,12 +2342,39 @@ fun BookCard(
                     verticalAlignment = Alignment.Bottom
                 ) {
                     Column {
-                        Text(
-                            text = "${book.availableQuantity} de ${book.totalQuantity} disp.",
-                            fontSize = 12.sp,
-                            color = if (book.availableQuantity > 0) ThemePurplePrimary else Color.Red,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "${book.availableQuantity} de ${book.totalQuantity} disp.",
+                                fontSize = 12.sp,
+                                color = if (book.availableQuantity > 0) ThemePurplePrimary else Color.Red,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (isOverdue) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(StatusOverdueRedBg)
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Warning,
+                                            contentDescription = "Possui cópias em atraso",
+                                            tint = StatusOverdueRedText,
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text(
+                                            text = "Atrasado",
+                                            fontSize = 9.sp,
+                                            color = StatusOverdueRedText,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         Text(
                             text = "Ano: ${book.year}",
                             fontSize = 11.sp,
@@ -2382,9 +2426,12 @@ fun LoanBookDialog(
     var borrowerClass by remember { mutableStateOf("") }
     var quantityToLoan by remember { mutableStateOf(1) }
     var errorText by remember { mutableStateOf("") }
+    var showQuickRegisterDialog by remember { mutableStateOf(false) }
 
     val allBorrowersList by viewModel.allBorrowers.collectAsStateWithLifecycle()
     val allLoansList by viewModel.loans.collectAsStateWithLifecycle()
+    val studentDays by viewModel.studentLoanDays.collectAsStateWithLifecycle()
+    val teacherDays by viewModel.teacherLoanDays.collectAsStateWithLifecycle()
 
     val filteredBorrowers = remember(borrowerName, allBorrowersList) {
         if (borrowerName.isBlank()) {
@@ -2613,6 +2660,46 @@ fun LoanBookDialog(
                         }
                     }
 
+                    // Calculo e visualizacao do Prazo de Devolucao (Return By)
+                    val daysToReturn = if (matchedBorrower.type == "Professor") teacherDays else studentDays
+                    val returnByTimestamp = System.currentTimeMillis() + (daysToReturn * 24L * 60 * 60 * 1000)
+                    val formattedReturnBy = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date(returnByTimestamp))
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = ThemePurpleLight.copy(alpha = 0.5f)),
+                        border = BorderStroke(1.dp, ThemePurplePrimary.copy(alpha = 0.3f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Event,
+                                contentDescription = "Prazo de Devolução",
+                                tint = ThemePurplePrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Prazo Limite para Devolução (Return By)",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = ThemePurplePrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Devolver até: $formattedReturnBy ($daysToReturn dias)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ThemePurplePrimary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
                     // Dynamic Quantity selector for teachers
                     if (matchedBorrower.type == "Professor") {
                         Spacer(modifier = Modifier.height(16.dp))
@@ -2687,29 +2774,49 @@ fun LoanBookDialog(
                         colors = CardDefaults.cardColors(containerColor = StatusOverdueRedBg.copy(alpha = 0.8f)),
                         border = BorderStroke(1.dp, StatusOverdueRedText.copy(alpha = 0.3f))
                     ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = "Aviso",
-                                tint = StatusOverdueRedText,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (allBorrowersList.isEmpty()) {
-                                    "Atenção: Não há leitores cadastrados no sistema. Cadastre-os primeiro na aba Leitores!"
-                                } else if (borrowerName.isBlank()) {
-                                    "Selecione um leitor cadastrado na lista abaixo."
-                                } else {
-                                    "Este leitor não está cadastrado! Escolha na lista de sugestões."
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = StatusOverdueRedText,
-                                fontWeight = FontWeight.Medium
-                            )
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "Aviso",
+                                    tint = StatusOverdueRedText,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (allBorrowersList.isEmpty()) {
+                                        "Atenção: Não há leitores cadastrados no sistema."
+                                    } else if (borrowerName.isBlank()) {
+                                        "Selecione um leitor cadastrado na lista ou crie um novo cadastro."
+                                    } else {
+                                        "Este leitor (\"$borrowerName\") não está cadastrado!"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = StatusOverdueRedText,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = { showQuickRegisterDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(36.dp)
+                                    .testTag("quick_register_borrower_button")
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Cadastrar", modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (borrowerName.isNotBlank()) "Cadastrar \"$borrowerName\"" else "Novo Perfil de Leitor",
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -2841,6 +2948,15 @@ fun LoanBookDialog(
                 }
             }
         }
+    }
+
+    if (showQuickRegisterDialog) {
+        AddEditBorrowerDialog(
+            borrowerToEdit = null,
+            viewModel = viewModel,
+            onDismiss = { showQuickRegisterDialog = false },
+            prefilledName = borrowerName
+        )
     }
 }
 
@@ -3125,8 +3241,12 @@ fun LoansTab(viewModel: LibraryViewModel) {
             } else {
                 items(filteredLoans, key = { it.id }) { loan ->
                     val borrowerPhone = allBorrowers.find { it.name == loan.borrowerName }?.phone
+                    val matchingBook = books.find { it.id == loan.bookId }
+                    val matchingBorrower = allBorrowers.find { it.name.lowercase() == loan.borrowerName.lowercase() }
                     LoanCard(
                         loan = loan,
+                        book = matchingBook,
+                        borrower = matchingBorrower,
                         borrowerPhone = borrowerPhone,
                         onRenew = {
                             viewModel.renewLoan(context, loan.id) { success ->
@@ -3207,6 +3327,8 @@ fun LoansTab(viewModel: LibraryViewModel) {
 @Composable
 fun LoanCard(
     loan: LoanEntity,
+    book: BookEntity? = null,
+    borrower: BorrowerEntity? = null,
     borrowerPhone: String? = null,
     onRenew: () -> Unit,
     onReturn: () -> Unit,
@@ -3329,6 +3451,46 @@ fun LoanCard(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val shareContext = LocalContext.current
+                    
+                    // Native Print / Save as PDF Button
+                    IconButton(
+                        onClick = {
+                            PdfPrintHelper.printLoanPdf(shareContext, loan, book, borrower)
+                        },
+                        modifier = Modifier.size(28.dp).testTag("print_loan_pdf_btn_${loan.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Print,
+                            contentDescription = "Imprimir ou Salvar PDF",
+                            tint = ThemePurplePrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.width(4.dp))
+                    
+                    // Share PDF Document Button
+                    IconButton(
+                        onClick = {
+                            val shareIntent = PdfPrintHelper.shareLoanPdf(shareContext, loan, book, borrower)
+                            if (shareIntent != null) {
+                                shareContext.startActivity(Intent.createChooser(shareIntent, "Compartilhar Comprovante PDF"))
+                            } else {
+                                Toast.makeText(shareContext, "Erro ao gerar comprovante PDF", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.size(28.dp).testTag("share_loan_pdf_btn_${loan.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Compartilhar Comprovante PDF",
+                            tint = ThemePurplePrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.width(4.dp))
+
                     IconButton(
                         onClick = {
                             val statusLabel = if (loan.returnDate != null) {
@@ -3362,9 +3524,9 @@ fun LoanCard(
                         modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Compartilhar",
-                            tint = ThemePurplePrimary,
+                            imageVector = Icons.Default.Assignment,
+                            contentDescription = "Compartilhar Texto",
+                            tint = ThemeSecondaryText,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -4598,6 +4760,161 @@ fun AddEditBookScreen(
         }
     }
 
+    val performAllCoversSearch: suspend (String) -> List<Pair<String, String>> = remember {
+        { cleanIsbn ->
+            val results = mutableListOf<Pair<String, java.lang.StringBuilder>>()
+            val mutex = kotlinx.coroutines.sync.Mutex()
+            
+            suspend fun safeAdd(source: String, url: String) {
+                mutex.lock()
+                try {
+                    if (results.none { it.second.toString() == url }) {
+                        results.add(source to java.lang.StringBuilder(url))
+                    }
+                } finally {
+                    mutex.unlock()
+                }
+            }
+
+            kotlinx.coroutines.coroutineScope {
+                // Task 1: Open Library direct cover
+                launch {
+                    try {
+                        val olUrl = "https://covers.openlibrary.org/b/isbn/$cleanIsbn-L.jpg?default=false"
+                        val conn = java.net.URL(olUrl).openConnection() as java.net.HttpURLConnection
+                        conn.requestMethod = "GET"
+                        conn.connectTimeout = 3000
+                        conn.readTimeout = 3000
+                        if (conn.responseCode == 200) {
+                            safeAdd("Open Library", olUrl)
+                        }
+                    } catch (e: Exception) {}
+                }
+
+                // Task 2: Open Library numeric covers IDs from isbn endpoint
+                launch {
+                    try {
+                        val olIsbnUrl = "https://openlibrary.org/isbn/$cleanIsbn.json"
+                        val conn = java.net.URL(olIsbnUrl).openConnection() as java.net.HttpURLConnection
+                        conn.requestMethod = "GET"
+                        conn.connectTimeout = 3000
+                        conn.readTimeout = 3000
+                        if (conn.responseCode == 200) {
+                            val text = conn.inputStream.bufferedReader().use { it.readText() }
+                            val json = org.json.JSONObject(text)
+                            if (json.has("covers")) {
+                                val coversArr = json.getJSONArray("covers")
+                                for (i in 0 until coversArr.length()) {
+                                    val id = coversArr.optInt(i, -1)
+                                    if (id != -1) {
+                                        safeAdd("Open Library (ID $id)", "https://covers.openlibrary.org/b/id/$id-L.jpg")
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {}
+                }
+
+                // Task 3: Amazon Cover
+                launch {
+                    try {
+                        val isbn10 = if (cleanIsbn.length == 13 && cleanIsbn.startsWith("978")) {
+                            val middle = cleanIsbn.substring(3, 12)
+                            var sum = 0
+                            for (i in 0 until 9) {
+                                sum += (middle[i] - '0') * (10 - i)
+                            }
+                            val check = 11 - (sum % 11)
+                            val checkStr = when (check) {
+                                10 -> "X"
+                                11 -> "0"
+                                else -> check.toString()
+                            }
+                            middle + checkStr
+                        } else {
+                            cleanIsbn
+                        }
+                        val amzUrl = "https://images.amazon.com/images/P/$isbn10.01.LZZZZZZZ.jpg"
+                        val conn = java.net.URL(amzUrl).openConnection() as java.net.HttpURLConnection
+                        conn.requestMethod = "GET"
+                        conn.connectTimeout = 3000
+                        conn.readTimeout = 3000
+                        val length = conn.contentLength
+                        if (conn.responseCode == 200 && length > 1500) {
+                            safeAdd("Amazon (Alta Res)", amzUrl)
+                        }
+                    } catch (e: Exception) {}
+                }
+
+                // Task 4: Google Books with zoom enhancement
+                launch {
+                    try {
+                        val response = com.example.network.ApiClient.googleBooksApi.searchBooks("isbn:$cleanIsbn")
+                        if (response.isSuccessful) {
+                            val body = response.body()
+                            if (body?.items != null && body.items.isNotEmpty()) {
+                                val volInfo = body.items[0].volumeInfo
+                                val thumb = volInfo?.imageLinks?.thumbnail
+                                if (thumb != null) {
+                                    val highResThumb = thumb.replace("http:", "https:")
+                                        .replace("&zoom=1", "&zoom=2")
+                                        .replace("&zoom=5", "&zoom=2")
+                                        .replace("edge=curl", "")
+                                    safeAdd("Google Books", highResThumb)
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {}
+                }
+
+                // Task 5: BrasilAPI Cover
+                launch {
+                    try {
+                        val brUrl = "https://brasilapi.com.br/api/isbn/v1/$cleanIsbn"
+                        val conn = java.net.URL(brUrl).openConnection() as java.net.HttpURLConnection
+                        conn.requestMethod = "GET"
+                        conn.connectTimeout = 3000
+                        conn.readTimeout = 3000
+                        if (conn.responseCode == 200) {
+                            val text = conn.inputStream.bufferedReader().use { it.readText() }
+                            val json = org.json.JSONObject(text)
+                            val cover = if (json.has("cover_url") && !json.isNull("cover_url")) json.getString("cover_url") else null
+                            if (!cover.isNullOrBlank()) {
+                                safeAdd("BrasilAPI (CBL)", cover)
+                            }
+                        }
+                    } catch (e: Exception) {}
+                }
+
+                // Task 6: Mercado Editorial
+                launch {
+                    try {
+                        val meUrl = "https://api.mercadoeditorial.org/api/v1.2/book?isbn=$cleanIsbn"
+                        val conn = java.net.URL(meUrl).openConnection() as java.net.HttpURLConnection
+                        conn.requestMethod = "GET"
+                        conn.connectTimeout = 3000
+                        conn.readTimeout = 3000
+                        if (conn.responseCode == 200) {
+                            val text = conn.inputStream.bufferedReader().use { it.readText() }
+                            val responseObj = org.json.JSONObject(text)
+                            if (responseObj.has("books")) {
+                                val booksArray = responseObj.getJSONArray("books")
+                                if (booksArray.length() > 0) {
+                                    val bookJson = booksArray.getJSONObject(0)
+                                    val cover = if (bookJson.has("imagem_capa") && !bookJson.isNull("imagem_capa")) bookJson.getString("imagem_capa") else null
+                                    if (!cover.isNullOrBlank()) {
+                                        safeAdd("Mercado Editorial", cover)
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {}
+                }
+            }
+            results.map { it.first to it.second.toString() }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -4721,6 +5038,12 @@ fun AddEditBookScreen(
                                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                         val cleanIsbn = isbnToSearch.replace("-", "").trim()
                                         var foundBookData = false
+                                        var foundTitle = ""
+                                        var foundAuthors = ""
+                                        var foundYear = ""
+                                        var foundPublisher = ""
+                                        var foundGenre = "Literatura Clássica"
+                                        var automaticCoverUrl: String? = null
 
                                         // ENGINE 1: BrasilAPI (Official CBL & Brazilian Book Database)
                                         try {
@@ -4736,8 +5059,8 @@ fun AddEditBookScreen(
                                                 reader.close()
                                                 
                                                 val jsonObj = org.json.JSONObject(response)
-                                                val foundTitle = if (jsonObj.has("title") && !jsonObj.isNull("title")) jsonObj.getString("title") else ""
-                                                val foundAuthors = if (jsonObj.has("authors") && !jsonObj.isNull("authors")) {
+                                                foundTitle = if (jsonObj.has("title") && !jsonObj.isNull("title")) jsonObj.getString("title") else ""
+                                                foundAuthors = if (jsonObj.has("authors") && !jsonObj.isNull("authors")) {
                                                     val authorsArray = jsonObj.getJSONArray("authors")
                                                     val authorsList = mutableListOf<String>()
                                                     for (i in 0 until authorsArray.length()) {
@@ -4746,9 +5069,12 @@ fun AddEditBookScreen(
                                                     authorsList.joinToString(", ")
                                                 } else ""
                                                 
-                                                val foundYear = if (jsonObj.has("year") && !jsonObj.isNull("year")) jsonObj.get("year").toString() else ""
+                                                foundYear = if (jsonObj.has("year") && !jsonObj.isNull("year")) jsonObj.get("year").toString() else ""
                                                 val foundCover = if (jsonObj.has("cover_url") && !jsonObj.isNull("cover_url")) jsonObj.getString("cover_url") else null
-                                                val foundPublisher = if (jsonObj.has("publisher") && !jsonObj.isNull("publisher")) jsonObj.getString("publisher") else ""
+                                                if (!foundCover.isNullOrBlank()) {
+                                                    automaticCoverUrl = foundCover
+                                                }
+                                                foundPublisher = if (jsonObj.has("publisher") && !jsonObj.isNull("publisher")) jsonObj.getString("publisher") else ""
                                                 
                                                 val subjectStr = if (jsonObj.has("subjects") && !jsonObj.isNull("subjects")) {
                                                     val array = jsonObj.getJSONArray("subjects")
@@ -4759,7 +5085,7 @@ fun AddEditBookScreen(
                                                     list.joinToString(" ")
                                                 } else ""
 
-                                                val mappedGenre = when {
+                                                foundGenre = when {
                                                     subjectStr.contains("ficção científica") || subjectStr.contains("ciencia ficcao") || subjectStr.contains("sci-fi") -> "Ficção Científica"
                                                     subjectStr.contains("história") || subjectStr.contains("historia") || subjectStr.contains("history") -> "História"
                                                     subjectStr.contains("poesia") || subjectStr.contains("poema") || subjectStr.contains("poetry") -> "Poesia"
@@ -4769,25 +5095,10 @@ fun AddEditBookScreen(
                                                     subjectStr.contains("clássico") || subjectStr.contains("classico") || subjectStr.contains("clássicos") -> "Literatura Clássica"
                                                     else -> "Outros"
                                                 }
-
-                                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                    if (foundTitle.isNotBlank()) title = foundTitle
-                                                    if (foundAuthors.isNotBlank()) author = foundAuthors
-                                                    if (foundYear.isNotBlank()) year = foundYear
-                                                    if (foundPublisher.isNotBlank()) {
-                                                        location = "Ed. $foundPublisher"
-                                                    }
-                                                    selectedGenre = mappedGenre
-                                                    if (foundCover != null && foundCover.isNotBlank()) {
-                                                        photoPathByUri = foundCover
-                                                    }
-                                                    isSearchingIsbn = false
-                                                    Toast.makeText(context, "Dados carregados do Busca ISBN nacional!", Toast.LENGTH_SHORT).show()
-                                                }
                                                 foundBookData = true
                                             }
                                         } catch (e: Exception) {
-                                            // Fallback to Google Books on error
+                                            // Fallback
                                         }
 
                                         // ENGINE 2: Google Books API (Fallback if BrasilAPI has no record or errored)
@@ -4799,35 +5110,109 @@ fun AddEditBookScreen(
                                                     if (body?.items != null && body.items.isNotEmpty()) {
                                                         val volumeInfo = body.items[0].volumeInfo
                                                         if (volumeInfo != null) {
-                                                            val foundTitle = volumeInfo.title ?: ""
-                                                            val foundAuthors = volumeInfo.authors?.firstOrNull() ?: ""
-                                                            val foundYear = volumeInfo.publishedDate?.take(4) ?: ""
+                                                            foundTitle = volumeInfo.title ?: ""
+                                                            foundAuthors = volumeInfo.authors?.joinToString(", ") ?: ""
+                                                            foundYear = volumeInfo.publishedDate?.take(4) ?: ""
                                                             val foundThumbnail = volumeInfo.imageLinks?.thumbnail?.replace("http:", "https:")
-
-                                                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                                if (foundTitle.isNotBlank()) title = foundTitle
-                                                                if (foundAuthors.isNotBlank()) author = foundAuthors
-                                                                if (foundYear.isNotBlank()) year = foundYear
-                                                                if (foundThumbnail != null) {
-                                                                    photoPathByUri = foundThumbnail
-                                                                }
-                                                                isSearchingIsbn = false
-                                                                Toast.makeText(context, "Dados importados do Google Books!", Toast.LENGTH_SHORT).show()
+                                                            if (!foundThumbnail.isNullOrBlank()) {
+                                                                automaticCoverUrl = foundThumbnail
                                                             }
+                                                            foundPublisher = volumeInfo.publisher ?: ""
                                                             foundBookData = true
                                                         }
                                                     }
                                                 }
                                             } catch (e: Exception) {
-                                                // Ignore and handle collectively below
+                                                // Fallback
                                             }
                                         }
 
-                                        // If both engines failed to retrieve the book data
+                                        // ENGINE 3: Open Library Book Data API (Fallback)
                                         if (!foundBookData) {
-                                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                isSearchingIsbn = false
-                                                Toast.makeText(context, "ISBN não encontrado ou erro de conexão.", Toast.LENGTH_LONG).show()
+                                            try {
+                                                val olUrlStr = "https://openlibrary.org/api/books?bibkeys=ISBN:$cleanIsbn&format=json&jscmd=data"
+                                                val olConn = java.net.URL(olUrlStr).openConnection() as java.net.HttpURLConnection
+                                                olConn.requestMethod = "GET"
+                                                olConn.connectTimeout = 8000
+                                                olConn.readTimeout = 8000
+                                                if (olConn.responseCode == 200) {
+                                                    val text = olConn.inputStream.bufferedReader().use { it.readText() }
+                                                    val responseJson = org.json.JSONObject(text)
+                                                    val bibKey = "ISBN:$cleanIsbn"
+                                                    if (responseJson.has(bibKey)) {
+                                                        val bookJson = responseJson.getJSONObject(bibKey)
+                                                        foundTitle = if (bookJson.has("title") && !bookJson.isNull("title")) bookJson.getString("title") else ""
+                                                        
+                                                        foundAuthors = if (bookJson.has("authors") && !bookJson.isNull("authors")) {
+                                                            val authorsArray = bookJson.getJSONArray("authors")
+                                                            val authorsList = mutableListOf<String>()
+                                                            for (i in 0 until authorsArray.length()) {
+                                                                val auObj = authorsArray.getJSONObject(i)
+                                                                if (auObj.has("name")) {
+                                                                    authorsList.add(auObj.getString("name"))
+                                                                }
+                                                            }
+                                                            authorsList.joinToString(", ")
+                                                        } else ""
+                                                        
+                                                        val pubDate = if (bookJson.has("publish_date") && !bookJson.isNull("publish_date")) bookJson.getString("publish_date") else ""
+                                                        foundYear = if (pubDate.length >= 4) pubDate.takeLast(4) else pubDate
+                                                        
+                                                        foundPublisher = if (bookJson.has("publishers") && !bookJson.isNull("publishers")) {
+                                                            val pubArray = bookJson.getJSONArray("publishers")
+                                                            if (pubArray.length() > 0) {
+                                                                pubArray.getJSONObject(0).optString("name", "")
+                                                            } else ""
+                                                        } else ""
+                                                        
+                                                        val coverObj = if (bookJson.has("cover") && !bookJson.isNull("cover")) bookJson.getJSONObject("cover") else null
+                                                        if (coverObj != null) {
+                                                            automaticCoverUrl = when {
+                                                                coverObj.has("large") -> coverObj.getString("large")
+                                                                coverObj.has("medium") -> coverObj.getString("medium")
+                                                                coverObj.has("small") -> coverObj.getString("small")
+                                                                else -> null
+                                                            }
+                                                        }
+                                                        foundBookData = true
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                // Ignore
+                                            }
+                                        }
+
+                                        // Concurrently load all other cover types for user choice carousel
+                                        var foundCovers: List<Pair<String, String>> = emptyList()
+                                        if (foundBookData) {
+                                            try {
+                                                foundCovers = performAllCoversSearch(cleanIsbn)
+                                            } catch (e: Exception) {}
+                                        }
+
+                                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                            isSearchingIsbn = false
+                                            if (foundBookData) {
+                                                if (foundTitle.isNotBlank()) title = foundTitle
+                                                if (foundAuthors.isNotBlank()) author = foundAuthors
+                                                if (foundYear.isNotBlank() && foundYear.toIntOrNull() != null) year = foundYear
+                                                if (foundPublisher.isNotBlank()) {
+                                                    location = "Ed. $foundPublisher"
+                                                }
+                                                selectedGenre = foundGenre
+                                                
+                                                if (foundCovers.isNotEmpty()) {
+                                                    foundCoversList = foundCovers
+                                                    photoPathByUri = foundCovers.first().second
+                                                    Toast.makeText(context, "Livro carregado e ${foundCovers.size} capas encontradas!", Toast.LENGTH_LONG).show()
+                                                } else if (!automaticCoverUrl.isNullOrBlank()) {
+                                                    photoPathByUri = automaticCoverUrl
+                                                    Toast.makeText(context, "Livro carregado e capa importada!", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "Livro preenchido sem capa disponível.", Toast.LENGTH_LONG).show()
+                                                }
+                                            } else {
+                                                Toast.makeText(context, "ISBN não encontrado ou bases de dados indisponíveis.", Toast.LENGTH_LONG).show()
                                             }
                                         }
                                     }
@@ -4966,120 +5351,7 @@ fun AddEditBookScreen(
                             if (cleanIsbn.isNotBlank()) {
                                 isSearchingCovers = true
                                 scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                    val results = mutableListOf<Pair<String, String>>()
-                                    
-                                    // 1. Open Library (with force 404 for missing covers)
-                                    try {
-                                        val olUrl = "https://covers.openlibrary.org/b/isbn/$cleanIsbn-L.jpg?default=false"
-                                        val conn = java.net.URL(olUrl).openConnection() as java.net.HttpURLConnection
-                                        conn.requestMethod = "GET"
-                                        conn.connectTimeout = 3000
-                                        conn.readTimeout = 3000
-                                        if (conn.responseCode == 200) {
-                                            results.add("Open Library" to olUrl)
-                                        }
-                                    } catch (e: Exception) {
-                                        // Ignore
-                                    }
-
-                                    // 2. Amazon High-Resolution (Calibre approach check)
-                                    try {
-                                        val isbn10 = if (cleanIsbn.length == 13 && cleanIsbn.startsWith("978")) {
-                                            val middle = cleanIsbn.substring(3, 12)
-                                            var sum = 0
-                                            for (i in 0 until 9) {
-                                                sum += (middle[i] - '0') * (10 - i)
-                                            }
-                                            val check = 11 - (sum % 11)
-                                            val checkStr = when (check) {
-                                                10 -> "X"
-                                                11 -> "0"
-                                                else -> check.toString()
-                                            }
-                                            middle + checkStr
-                                        } else {
-                                            cleanIsbn
-                                        }
-                                        
-                                        val amzUrl = "https://images.amazon.com/images/P/$isbn10.01.LZZZZZZZ.jpg"
-                                        val conn = java.net.URL(amzUrl).openConnection() as java.net.HttpURLConnection
-                                        conn.requestMethod = "GET"
-                                        conn.connectTimeout = 3000
-                                        conn.readTimeout = 3000
-                                        val length = conn.contentLength
-                                        // Amazon returns 200 for 1x1 spacer gif if not found; we check contentLength
-                                        if (conn.responseCode == 200 && length > 1500) {
-                                            results.add("Amazon (Alta Res)" to amzUrl)
-                                        }
-                                    } catch (e: Exception) {
-                                        // Ignore
-                                    }
-
-                                    // 3. Google Books (Max Quality zoom upgrade)
-                                    try {
-                                        val response = com.example.network.ApiClient.googleBooksApi.searchBooks("isbn:$cleanIsbn")
-                                        if (response.isSuccessful) {
-                                            val body = response.body()
-                                            if (body?.items != null && body.items.isNotEmpty()) {
-                                                val volInfo = body.items[0].volumeInfo
-                                                val thumb = volInfo?.imageLinks?.thumbnail
-                                                if (thumb != null) {
-                                                    val highResThumb = thumb.replace("http:", "https:")
-                                                        .replace("&zoom=1", "&zoom=2")
-                                                        .replace("&zoom=5", "&zoom=2")
-                                                        .replace("edge=curl", "")
-                                                    results.add("Google Books" to highResThumb)
-                                                }
-                                            }
-                                        }
-                                    } catch (e: Exception) {
-                                        // Ignore
-                                    }
-
-                                    // 4. BrasilAPI Cover fallback
-                                    try {
-                                        val brUrl = "https://brasilapi.com.br/api/isbn/v1/$cleanIsbn"
-                                        val conn = java.net.URL(brUrl).openConnection() as java.net.HttpURLConnection
-                                        conn.requestMethod = "GET"
-                                        conn.connectTimeout = 3000
-                                        conn.readTimeout = 3000
-                                        if (conn.responseCode == 200) {
-                                            val text = conn.inputStream.bufferedReader().use { it.readText() }
-                                            val json = org.json.JSONObject(text)
-                                            val cover = if (json.has("cover_url") && !json.isNull("cover_url")) json.getString("cover_url") else null
-                                            if (!cover.isNullOrBlank()) {
-                                                results.add("BrasilAPI (CBL)" to cover)
-                                            }
-                                        }
-                                    } catch (e: Exception) {
-                                        // Ignore
-                                    }
-
-                                    // 5. Mercado Editorial API (Brasil)
-                                    try {
-                                        val meUrl = "https://api.mercadoeditorial.org/api/v1.2/book?isbn=$cleanIsbn"
-                                        val conn = java.net.URL(meUrl).openConnection() as java.net.HttpURLConnection
-                                        conn.requestMethod = "GET"
-                                        conn.connectTimeout = 3000
-                                        conn.readTimeout = 3000
-                                        if (conn.responseCode == 200) {
-                                            val text = conn.inputStream.bufferedReader().use { it.readText() }
-                                            val responseObj = org.json.JSONObject(text)
-                                            if (responseObj.has("books")) {
-                                                val booksArray = responseObj.getJSONArray("books")
-                                                if (booksArray.length() > 0) {
-                                                    val bookJson = booksArray.getJSONObject(0)
-                                                    val cover = if (bookJson.has("imagem_capa") && !bookJson.isNull("imagem_capa")) bookJson.getString("imagem_capa") else null
-                                                    if (!cover.isNullOrBlank()) {
-                                                        results.add("Mercado Editorial" to cover)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    } catch (e: Exception) {
-                                        // Ignore
-                                    }
-
+                                    val results = performAllCoversSearch(cleanIsbn)
                                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                         isSearchingCovers = false
                                         foundCoversList = results
@@ -5815,10 +6087,11 @@ fun BorrowerAvatar(
 fun AddEditBorrowerDialog(
     borrowerToEdit: BorrowerEntity?,
     viewModel: LibraryViewModel,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    prefilledName: String = ""
 ) {
     val context = LocalContext.current
-    var name by remember { mutableStateOf(borrowerToEdit?.name ?: "") }
+    var name by remember { mutableStateOf(borrowerToEdit?.name ?: prefilledName) }
     var type by remember { mutableStateOf(borrowerToEdit?.type ?: "Aluno") } // "Aluno" or "Professor"
     var classRoom by remember { mutableStateOf(borrowerToEdit?.classRoom ?: "") }
     var identifier by remember { mutableStateOf(borrowerToEdit?.identifier ?: "") }
@@ -6148,6 +6421,7 @@ fun BorrowerDetailsDialog(
 ) {
     val context = LocalContext.current
     val loans by viewModel.loans.collectAsStateWithLifecycle()
+    val books by viewModel.books.collectAsStateWithLifecycle()
     
     val userLoans = remember(loans, borrower.name) {
         loans.filter { it.borrowerName.lowercase() == borrower.name.lowercase() }
@@ -6418,6 +6692,7 @@ fun BorrowerDetailsDialog(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(userLoans) { loan ->
+                            val matchingBook = books.find { it.id == loan.bookId }
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = ThemeBackground),
                                 border = BorderStroke(1.dp, ThemeBorder),
@@ -6504,26 +6779,62 @@ fun BorrowerDetailsDialog(
                                             }
                                         }
 
-                                        // Quick return button for active loans
-                                        if (loan.returnDate == null) {
-                                            Button(
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            IconButton(
                                                 onClick = {
-                                                    if (loan.quantity > 1) {
-                                                        showPartialReturnDialog = loan
+                                                    PdfPrintHelper.printLoanPdf(context, loan, matchingBook, borrower)
+                                                },
+                                                modifier = Modifier.size(28.dp).testTag("print_borrower_loan_${loan.id}")
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Print,
+                                                    contentDescription = "Imprimir PDF",
+                                                    tint = ThemePurplePrimary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    val shareIntent = PdfPrintHelper.shareLoanPdf(context, loan, matchingBook, borrower)
+                                                    if (shareIntent != null) {
+                                                        context.startActivity(Intent.createChooser(shareIntent, "Compartilhar PDF"))
                                                     } else {
-                                                        viewModel.returnBook(context, loan.id, 1) { success ->
-                                                            if (success) {
-                                                                Toast.makeText(context, "Livro devolvido!", Toast.LENGTH_SHORT).show()
-                                                            }
-                                                        }
+                                                        Toast.makeText(context, "Erro ao gerar PDF", Toast.LENGTH_SHORT).show()
                                                     }
                                                 },
-                                                colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
-                                                shape = RoundedCornerShape(8.dp),
-                                                modifier = Modifier.height(28.dp),
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                                                modifier = Modifier.size(28.dp).testTag("share_borrower_loan_${loan.id}")
                                             ) {
-                                                Text("Receber", fontSize = 10.sp)
+                                                Icon(
+                                                    imageVector = Icons.Default.Share,
+                                                    contentDescription = "Compartilhar PDF",
+                                                    tint = ThemePurplePrimary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                            if (loan.returnDate == null) {
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Button(
+                                                    onClick = {
+                                                        if (loan.quantity > 1) {
+                                                            showPartialReturnDialog = loan
+                                                        } else {
+                                                            viewModel.returnBook(context, loan.id, 1) { success ->
+                                                                if (success) {
+                                                                    Toast.makeText(context, "Livro devolvido!", Toast.LENGTH_SHORT).show()
+                                                                }
+                                                            }
+                                                        }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    modifier = Modifier.height(28.dp).testTag("receive_borrower_loan_${loan.id}"),
+                                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text("Receber", fontSize = 10.sp)
+                                                }
                                             }
                                         }
                                     }
@@ -6929,65 +7240,102 @@ fun BookDetailsDialog(
                         }
                     } else {
                         items(bookLoans) { loan ->
+                            val isLoanOverdue = loan.returnDate == null && loan.calculatedIsOverdue()
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = ThemeBackground),
-                                border = BorderStroke(1.dp, ThemeBorder),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (loan.returnDate != null) ThemeBackground else if (isLoanOverdue) StatusOverdueRedBg.copy(alpha = 0.5f) else ThemePurpleLight.copy(alpha = 0.3f)
+                                ),
+                                border = BorderStroke(
+                                    1.dp, 
+                                    if (loan.returnDate != null) ThemeBorder else if (isLoanOverdue) StatusOverdueRedText.copy(alpha = 0.3f) else ThemePurplePrimary.copy(alpha = 0.3f)
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
                             ) {
                                 Row(
                                     modifier = Modifier
-                                        .padding(10.dp)
+                                        .padding(12.dp)
                                         .fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = loan.borrowerName,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
-                                            color = ThemeOnBackground
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically, 
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (loan.returnDate != null) Icons.Default.CheckCircle else if (isLoanOverdue) Icons.Default.Warning else Icons.Default.Pending,
+                                            contentDescription = null,
+                                            tint = if (loan.returnDate != null) StatusAvailableGreenText else if (isLoanOverdue) StatusOverdueRedText else ThemePurplePrimary,
+                                            modifier = Modifier.size(20.dp)
                                         )
-                                        Text(
-                                            text = "Turma/Contato: ${loan.borrowerClass}",
-                                            fontSize = 10.sp,
-                                            color = ThemeSecondaryText
-                                        )
-                                        Text(
-                                            text = "Empréstimo: ${dateFormat.format(Date(loan.loanDate))}",
-                                            fontSize = 10.sp,
-                                            color = ThemeSecondaryText
-                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = loan.borrowerName,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = ThemeOnBackground
+                                            )
+                                            Text(
+                                                text = "Leitor: ${loan.borrowerClass}",
+                                                fontSize = 10.sp,
+                                                color = ThemeSecondaryText
+                                            )
+                                            Text(
+                                                text = "Retirado em: ${dateFormat.format(Date(loan.loanDate))}",
+                                                fontSize = 9.sp,
+                                                color = ThemeSecondaryText
+                                            )
+                                            if (loan.returnDate != null) {
+                                                Text(
+                                                    text = "Devolvido em: ${dateFormat.format(Date(loan.returnDate))}",
+                                                    fontSize = 9.sp,
+                                                    color = StatusAvailableGreenText,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        }
                                     }
 
                                     Column(horizontalAlignment = Alignment.End) {
                                         if (loan.returnDate != null) {
-                                            Text(
-                                                text = "Devolvido",
-                                                color = StatusAvailableGreenText,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 10.sp
-                                            )
-                                            Text(
-                                                text = dateFormat.format(Date(loan.returnDate)),
-                                                color = ThemeSecondaryText,
-                                                fontSize = 9.sp
-                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(StatusAvailableGreenBg)
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Devolvido",
+                                                    color = StatusAvailableGreenText,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 9.sp
+                                                )
+                                            }
                                         } else {
-                                            Text(
-                                                text = "Em aberto",
-                                                color = ThemePurplePrimary,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 10.sp
-                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(if (isLoanOverdue) StatusOverdueRedBg else ThemePurpleLight)
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (isLoanOverdue) "Atrasado" else "Em aberto",
+                                                    color = if (isLoanOverdue) StatusOverdueRedText else ThemePurplePrimary,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 9.sp
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
                                             Text(
                                                 text = "Prazo: ${dateFormat.format(Date(loan.dueDate))}",
-                                                color = if (loan.calculatedIsOverdue()) Color.Red else ThemeSecondaryText,
-                                                fontSize = 9.sp
+                                                color = if (isLoanOverdue) Color.Red else ThemeSecondaryText,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Medium
                                             )
                                             
-                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Spacer(modifier = Modifier.height(6.dp))
                                             
                                             Button(
                                                 onClick = {
@@ -7001,12 +7349,14 @@ fun BookDetailsDialog(
                                                         }
                                                     }
                                                 },
-                                                colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (isLoanOverdue) StatusOverdueRedText else ThemePurplePrimary
+                                                ),
                                                 shape = RoundedCornerShape(6.dp),
                                                 modifier = Modifier.height(24.dp),
                                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                                             ) {
-                                                Text("Receber", fontSize = 9.sp)
+                                                Text("Receber", fontSize = 9.sp, color = Color.White)
                                             }
                                         }
                                     }

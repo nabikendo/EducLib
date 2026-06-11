@@ -122,6 +122,10 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
                 val genreMatch = isFuzzyMatch(query, book.genre)
                 val locationMatch = isFuzzyMatch(query, book.location)
                 
+                val cleanQuery = query.replace("-", "").trim()
+                val cleanIsbn = book.isbn.replace("-", "").trim()
+                val isbnMatch = cleanIsbn.isNotBlank() && cleanQuery.isNotBlank() && (cleanIsbn.contains(cleanQuery) || cleanQuery.contains(cleanIsbn))
+                
                 var shelfMatch = false
                 var coordMatch = false
                 if (book.posicaoEstanteId != null) {
@@ -135,7 +139,7 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
                     }
                 }
                 
-                titleMatch || authorMatch || genreMatch || locationMatch || shelfMatch || coordMatch
+                titleMatch || authorMatch || genreMatch || locationMatch || shelfMatch || coordMatch || isbnMatch
             }
         }
     }

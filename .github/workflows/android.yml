@@ -1,7 +1,6 @@
 name: Android CI
-
-  on: push
-
+  on:
+    push:
   jobs:
     build:
       runs-on: ubuntu-latest
@@ -13,7 +12,7 @@ name: Android CI
             distribution: 'temurin'
             cache: gradle
         - run: chmod +x gradlew
-        - run: ./gradle gradle assembleDebug
+        - run: ./gradlew assembleDebug
         - uses: actions/upload-artifact@v4
           with:
             name: app-debug

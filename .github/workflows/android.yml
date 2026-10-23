@@ -13,7 +13,7 @@ name: Android CI
             distribution: 'temurin'
             cache: gradle
         - run: chmod +x gradlew
-        - run: ./gradlew assembleDebug
+        - run: ./gradle gradle assembleDebug
         - uses: actions/upload-artifact@v4
           with:
             name: app-debug

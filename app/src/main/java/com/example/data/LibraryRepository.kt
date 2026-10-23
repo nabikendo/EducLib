@@ -128,4 +128,3 @@ package com.example.data
       val weeklySuggestions: Flow<List<WeeklySuggestionEntity>> = suggestionDao.getAllSuggestions()
   }
 
-  ---

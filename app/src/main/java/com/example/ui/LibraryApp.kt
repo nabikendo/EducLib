@@ -51,9 +51,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextDecoration
@@ -114,6 +116,10 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var masterPassword by remember { mutableStateOf("") }
+    
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
+    var masterPasswordVisible by remember { mutableStateOf(false) }
     
     // Auth method sub-choice inside login
     var loginByMasterPassword by remember { mutableStateOf(false) }
@@ -340,7 +346,16 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                                 label = { Text("Senha") },
                                 placeholder = { Text("Mínimo 4 caracteres") },
                                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF64748B)) },
-                                visualTransformation = PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                        Icon(
+                                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                            contentDescription = if (passwordVisible) "Ocultar senha" else "Visualizar senha",
+                                            tint = Color(0xFF64748B)
+                                        )
+                                    }
+                                },
+                                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth().testTag("setup_password_input"),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -362,7 +377,16 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                                 label = { Text("Confirmar Senha") },
                                 placeholder = { Text("Repita a sua senha") },
                                 leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF64748B)) },
-                                visualTransformation = PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                                        Icon(
+                                            imageVector = if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                            contentDescription = if (confirmPasswordVisible) "Ocultar senha" else "Visualizar senha",
+                                            tint = Color(0xFF64748B)
+                                        )
+                                    }
+                                },
+                                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth().testTag("setup_confirm_password_input"),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -384,7 +408,16 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                                     label = { Text("Senha Mestre") },
                                     placeholder = { Text("Sua senha de acesso local") },
                                     leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, tint = Color(0xFF64748B)) },
-                                    visualTransformation = PasswordVisualTransformation(),
+                                    trailingIcon = {
+                                        IconButton(onClick = { masterPasswordVisible = !masterPasswordVisible }) {
+                                            Icon(
+                                                imageVector = if (masterPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                                contentDescription = if (masterPasswordVisible) "Ocultar senha" else "Visualizar senha",
+                                                tint = Color(0xFF64748B)
+                                            )
+                                        }
+                                    },
+                                    visualTransformation = if (masterPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth().testTag("password_input"),
                                     colors = OutlinedTextFieldDefaults.colors(
@@ -434,7 +467,16 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                                     label = { Text("Senha") },
                                     placeholder = { Text("Digite sua senha") },
                                     leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF64748B)) },
-                                    visualTransformation = PasswordVisualTransformation(),
+                                    trailingIcon = {
+                                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                            Icon(
+                                                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                                contentDescription = if (passwordVisible) "Ocultar senha" else "Visualizar senha",
+                                                tint = Color(0xFF64748B)
+                                            )
+                                        }
+                                    },
+                                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth().testTag("login_password_input"),
                                     colors = OutlinedTextFieldDefaults.colors(
@@ -575,6 +617,37 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                                 Text(
                                     text = if (isSignUp) "Cadastrar com o Google" else "Entrar com o Google",
                                     color = ThemeSecondaryText.copy(alpha = 0.8f),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = { viewModel.guestLogin() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                                .testTag("guest_login_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)), // Emerald Green for friendly access
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Bolt,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Entrar Direto (Acesso de Teste)",
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
                                 )
@@ -1712,6 +1785,15 @@ fun CatalogTab(
     var showScanner by remember { mutableStateOf(false) }
     var showFichaEtiquetaForBook by remember { mutableStateOf<BookEntity?>(null) }
 
+    var isInventoryMode by rememberSaveable { mutableStateOf(false) }
+    var qTitle by remember { mutableStateOf("") }
+    var qAuthor by remember { mutableStateOf("") }
+    var qIsbn by remember { mutableStateOf("") }
+    var qQuantity by remember { mutableStateOf("1") }
+    var qGenre by remember { mutableStateOf("Literatura Clássica") }
+    var showQuickAddForm by remember { mutableStateOf(false) }
+    var qError by remember { mutableStateOf("") }
+
 
     val barcodeLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         if (result.contents != null) {
@@ -1888,6 +1970,230 @@ fun CatalogTab(
                     viewModel.removeSuggestion(context, suggestion)
                 }
             )
+        }
+
+        // 2.7 View toggle: Catalog vs Inventory dashboard
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ThemePurpleLight.copy(alpha = 0.5f))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (!isInventoryMode) ThemePurplePrimary else Color.Transparent)
+                            .clickable { isInventoryMode = false }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.GridView,
+                                contentDescription = null,
+                                tint = if (!isInventoryMode) Color.White else ThemePurplePrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Catálogo Visual",
+                                fontWeight = FontWeight.Bold,
+                                color = if (!isInventoryMode) Color.White else ThemePurplePrimary,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isInventoryMode) ThemePurplePrimary else Color.Transparent)
+                            .clickable { isInventoryMode = true }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Inventory2,
+                                contentDescription = null,
+                                tint = if (isInventoryMode) Color.White else ThemePurplePrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Estoque / Inventário",
+                                fontWeight = FontWeight.Bold,
+                                color = if (isInventoryMode) Color.White else ThemePurplePrimary,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+
+                // Collapsible Quick Add Form Card (exactly fields title, author, isbn, quantity!)
+                if (isInventoryMode) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = ThemePurpleLight.copy(alpha = 0.3f)),
+                        border = BorderStroke(1.dp, ThemePurpleLight.copy(alpha = 0.6f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable { showQuickAddForm = !showQuickAddForm },
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.LibraryAdd,
+                                        contentDescription = null,
+                                        tint = ThemePurplePrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Lançamento Rápido no Inventário",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = ThemePurplePrimary
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (showQuickAddForm) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null,
+                                    tint = ThemePurplePrimary
+                                )
+                            }
+
+                            if (showQuickAddForm) {
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    OutlinedTextField(
+                                        value = qTitle,
+                                        onValueChange = { qTitle = it },
+                                        label = { Text("Título do Livro") },
+                                        placeholder = { Text("Ex: O Alquimista") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth().testTag("quick_add_title"),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = ThemePurplePrimary,
+                                            focusedContainerColor = Color.White,
+                                            unfocusedContainerColor = Color.White
+                                        ),
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+
+                                    OutlinedTextField(
+                                        value = qAuthor,
+                                        onValueChange = { qAuthor = it },
+                                        label = { Text("Autor") },
+                                        placeholder = { Text("Ex: Paulo Coelho") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth().testTag("quick_add_author"),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = ThemePurplePrimary,
+                                            focusedContainerColor = Color.White,
+                                            unfocusedContainerColor = Color.White
+                                        ),
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = qIsbn,
+                                            onValueChange = { qIsbn = it },
+                                            label = { Text("Código ISBN") },
+                                            placeholder = { Text("Ex: 9788575420361") },
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1.2f).testTag("quick_add_isbn"),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = ThemePurplePrimary,
+                                                focusedContainerColor = Color.White,
+                                                unfocusedContainerColor = Color.White
+                                            ),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+
+                                        OutlinedTextField(
+                                            value = qQuantity,
+                                            onValueChange = { qQuantity = it },
+                                            label = { Text("Qtd. Inicial") },
+                                            placeholder = { Text("1") },
+                                            singleLine = true,
+                                            modifier = Modifier.weight(0.8f).testTag("quick_add_quantity"),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = ThemePurplePrimary,
+                                                focusedContainerColor = Color.White,
+                                                unfocusedContainerColor = Color.White
+                                            ),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                    }
+
+                                    if (qError.isNotEmpty()) {
+                                        Text(
+                                            text = qError,
+                                            color = Color.Red,
+                                            fontSize = 11.sp,
+                                            modifier = Modifier.padding(top = 2.dp)
+                                        )
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            val qtyInt = qQuantity.toIntOrNull()
+                                            if (qTitle.isBlank() || qAuthor.isBlank() || qtyInt == null) {
+                                                qError = "Preencha todos os campos obrigatórios e coloque uma quantidade válida."
+                                            } else if (qtyInt <= 0) {
+                                                qError = "A quantidade inicial deve ser maior que zero."
+                                            } else {
+                                                qError = ""
+                                                viewModel.addBook(
+                                                    context = context,
+                                                    title = qTitle,
+                                                    author = qAuthor,
+                                                    isbn = qIsbn,
+                                                    genre = qGenre,
+                                                    year = 2026,
+                                                    location = "Estoque / Inventário",
+                                                    photoPath = null,
+                                                    totalQuantity = qtyInt
+                                                )
+                                                Toast.makeText(context, "Livro cadastrado com sucesso no inventário!", Toast.LENGTH_SHORT).show()
+                                                qTitle = ""
+                                                qAuthor = ""
+                                                qIsbn = ""
+                                                qQuantity = "1"
+                                                showQuickAddForm = false
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("Registrar no Estoque", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // 3. Search and Scanner Row
@@ -2083,35 +2389,209 @@ fun CatalogTab(
                 }
             }
         } else {
-            items(filteredBooks) { book ->
-                val shelfLocationText = remember(book.posicaoEstanteId, shelves, positions) {
-                    if (book.posicaoEstanteId != null) {
-                        val pos = positions.find { it.id == book.posicaoEstanteId }
-                        val sh = shelves.find { it.id == pos?.shelfId }
-                        if (sh != null && pos != null) {
-                            "${sh.name} • ${pos.coordinate}"
+            if (isInventoryMode) {
+                items(filteredBooks, span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { book ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp).testTag("inventory_item_${book.id}"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = book.title,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = ThemeOnBackground
+                                    )
+                                    Text(
+                                        text = "Autor: ${book.author}",
+                                        fontSize = 12.sp,
+                                        color = ThemeSecondaryText
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.QrCode,
+                                            contentDescription = "ISBN",
+                                            tint = ThemePurplePrimary.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = "ISBN: ${if (book.isbn.isNotBlank()) book.isbn else "Sem ISBN"}",
+                                            fontSize = 11.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = ThemeSecondaryText
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            val newQty = (book.totalQuantity - 1).coerceAtLeast(0)
+                                            viewModel.updateBook(
+                                                context = context,
+                                                book = book,
+                                                title = book.title,
+                                                author = book.author,
+                                                isbn = book.isbn,
+                                                genre = book.genre,
+                                                year = book.year,
+                                                location = book.location,
+                                                photoPath = book.photoPath,
+                                                totalQuantity = newQty
+                                            )
+                                        },
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(ThemePurpleLight)
+                                            .testTag("inventory_item_dec_${book.id}")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Remove,
+                                            contentDescription = "Remover cópia",
+                                            tint = ThemePurplePrimary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            text = "${book.availableQuantity}/${book.totalQuantity}",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = ThemePurplePrimary
+                                        )
+                                        Text(
+                                            text = "Disponíveis",
+                                            fontSize = 9.sp,
+                                            color = ThemeSecondaryText
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            val newQty = book.totalQuantity + 1
+                                            viewModel.updateBook(
+                                                context = context,
+                                                book = book,
+                                                title = book.title,
+                                                author = book.author,
+                                                isbn = book.isbn,
+                                                genre = book.genre,
+                                                year = book.year,
+                                                location = book.location,
+                                                photoPath = book.photoPath,
+                                                totalQuantity = newQty
+                                            )
+                                        },
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(ThemePurpleLight)
+                                            .testTag("inventory_item_inc_${book.id}")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "Adicionar cópia",
+                                            tint = ThemePurplePrimary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF1F5F9))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Gênero: ${book.genre}",
+                                    fontSize = 11.sp,
+                                    color = ThemeSecondaryText
+                                )
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    TextButton(
+                                        onClick = { onEditBookClick(book) },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(12.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Editar", fontSize = 11.sp)
+                                    }
+
+                                    TextButton(
+                                        onClick = {
+                                            AlertDialogHelper.showConfirmDialog(
+                                                context = context,
+                                                title = "Excluir Registro",
+                                                message = "Excluir definitivamente o registro de \"${book.title}\"? Isso removerá todo o histórico de empréstimos correspondentes.",
+                                                onConfirm = { viewModel.deleteBook(context, book) }
+                                            )
+                                        },
+                                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF4444)),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(12.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Excluir", fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                items(filteredBooks) { book ->
+                    val shelfLocationText = remember(book.posicaoEstanteId, shelves, positions) {
+                        if (book.posicaoEstanteId != null) {
+                            val pos = positions.find { it.id == book.posicaoEstanteId }
+                            val sh = shelves.find { it.id == pos?.shelfId }
+                            if (sh != null && pos != null) {
+                                "${sh.name} • ${pos.coordinate}"
+                            } else null
                         } else null
-                    } else null
+                    }
+                    val isOverdue = remember(loans, book.id) {
+                        loans.any { it.bookId == book.id && it.returnDate == null && it.calculatedIsOverdue() }
+                    }
+                    BookCard(
+                        book = book,
+                        shelfLocationText = shelfLocationText,
+                        isOverdue = isOverdue,
+                        onEdit = { onEditBookClick(book) },
+                        onDelete = {
+                            AlertDialogHelper.showConfirmDialog(
+                                context = context,
+                                title = "Excluir Livro",
+                                message = "Deseja realmente excluir \"${book.title}\"? Isso removerá as referências de estoque local.",
+                                onConfirm = { viewModel.deleteBook(context, book) }
+                            )
+                        },
+                        onLoan = { showDialogForLoanBook = book },
+                        onCardClick = { showBookDetailsDialog = book }
+                    )
                 }
-                val isOverdue = remember(loans, book.id) {
-                    loans.any { it.bookId == book.id && it.returnDate == null && it.calculatedIsOverdue() }
-                }
-                BookCard(
-                    book = book,
-                    shelfLocationText = shelfLocationText,
-                    isOverdue = isOverdue,
-                    onEdit = { onEditBookClick(book) },
-                    onDelete = {
-                        AlertDialogHelper.showConfirmDialog(
-                            context = context,
-                            title = "Excluir Livro",
-                            message = "Deseja realmente excluir \"${book.title}\"? Isso removerá as referências de estoque local.",
-                            onConfirm = { viewModel.deleteBook(context, book) }
-                        )
-                    },
-                    onLoan = { showDialogForLoanBook = book },
-                    onCardClick = { showBookDetailsDialog = book }
-                )
             }
         }
     }

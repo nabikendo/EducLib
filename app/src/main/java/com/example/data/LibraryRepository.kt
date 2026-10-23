@@ -49,7 +49,7 @@ package com.example.data
       }
 
       /**
-       * NOVA FUNCIONALIDADE: Busca dados de um livro via ISBN na Google Books API
+       * Busca dados de um livro via ISBN na Google Books API
        * Retorna um BookEntity preenchido com os dados da web para auto-preenchimento na UI
        */
       suspend fun fetchBookByIsbn(isbn: String): BookEntity? = withContext(Dispatchers.IO) {
@@ -69,7 +69,7 @@ package com.example.data
                       coverUrl = volumeInfo.imageLinks?.thumbnail ?: "",
                       category = volumeInfo.categories?.firstOrNull() ?: "Geral",
                       description = volumeInfo.description ?: "",
-                      shelfId = 0, // Será definido pelo usuário na UI
+                      shelfId = 0,
                       status = "Available"
                   )
               }
@@ -128,3 +128,4 @@ package com.example.data
       val weeklySuggestions: Flow<List<WeeklySuggestionEntity>> = suggestionDao.getAllSuggestions()
   }
 
+  ---

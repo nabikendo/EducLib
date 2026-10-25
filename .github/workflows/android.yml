@@ -60,19 +60,3 @@ jobs:
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
-
-
-2. Alternativa via Terminal Local (Git CLI)
-
-Se preferir restaurar os arquivos completos pelo terminal do seu computador:
-
-git clone https://github.com/nabikendo/EducLib.git
-cd EducLib
-
-git checkout 34a2a78 -- app/src/main/java/com/example/ui/LibraryApp.kt
-git checkout 34a2a78 -- app/src/main/java/com/example/ui/LibraryViewModel.kt
-git checkout 34a2a78 -- app/src/main/java/com/example/data/LibraryRepository.kt
-git rm -f --ignore-unmatch app/src/main/java/com/example/ui/BookManagementScreen.kt app/src/main/java/com/example/ui/BookManagementScreens.kt app/src/main/java/com/example/ui/AuthScreens.kt
-
-git commit -m "fix: restore complete application files from 34a2a78"
-git push origin main

@@ -306,7 +306,7 @@ object PdfPrintHelper {
         val file = generateLoanReceiptPdf(context, loan, book, borrower)
         if (file != null) {
             val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
-            val jobName = "BiblioTech_Comprovante_${loan.id}"
+            val jobName = "EducLib_Comprovante_${loan.id}"
             val printAdapter = FilePrintDocumentAdapter(file)
             printManager.print(jobName, printAdapter, PrintAttributes.Builder().build())
         }
@@ -323,7 +323,7 @@ object PdfPrintHelper {
             android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                 type = "application/pdf"
                 putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                putExtra(android.content.Intent.EXTRA_SUBJECT, "Comprovante de Empréstimo - BiblioTech")
+                putExtra(android.content.Intent.EXTRA_SUBJECT, "Comprovante de Empréstimo - EducLib")
                 putExtra(android.content.Intent.EXTRA_TEXT, "Segue em anexo o comprovante de empréstimo do livro \"${loan.bookTitle}\" em formato PDF.")
                 addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }

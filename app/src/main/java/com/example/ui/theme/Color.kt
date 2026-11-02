@@ -2,27 +2,45 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// High Contrast Color Palette (Ultra-Legibility Under Fluorescent Lights)
-val ThemePurplePrimary = Color(0xFF1A0066) // Deep crisp royal indigo for ultimate button and accent contrast (15:1 ratio)
-val ThemePurpleLight = Color(0xFFEADBFF)   // Saturated background accent container (very legible)
-val ThemeOnPrimary = Color(0xFFFFFFFF)       // Icons and text on primary buttons
-val ThemeBackground = Color(0xFFFFFFFF)    // Absolute crisp pure white backdrop for maximal reflection contrast
-val ThemeOnBackground = Color(0xFF0D0D0D)  // Near-pure solid rich dark black for bold headings and body (21:1 contrast)
-val ThemeSecondaryText = Color(0xFF2B2B33) // Deep charcoal gray for secondary descriptors (retains high legibility)
-val ThemeBorder = Color(0xFF71707E)        // Stronger, darker outline border to prevent clipping under bright light washes
+/**
+ * EducLib visual system: an editorial library palette built around warm paper,
+ * forest ink and a restrained terracotta accent.
+ */
+val LibraryForest = Color(0xFF124B3E)
+val LibraryForestDeep = Color(0xFF0B3028)
+val LibrarySage = Color(0xFFE3EEE8)
+val LibrarySageStrong = Color(0xFFD5E7DD)
+val LibraryPaper = Color(0xFFF8F6F0)
+val LibrarySurface = Color(0xFFFFFFFF)
+val LibrarySurfaceAlt = Color(0xFFEEF1EC)
+val LibraryInk = Color(0xFF172521)
+val LibraryMuted = Color(0xFF40544C)
+val LibraryOutline = Color(0xFF7D8B83)
+val LibraryControlOutline = Color(0xFF66766E)
+val LibraryTerracotta = Color(0xFF91442F)
+val LibraryApricot = Color(0xFFF7E5DA)
 
-// Secondary layout accent elements (Bento style)
-val BentoPurpleActive = Color(0xFFD3BFFF)  // Light purple active container accent
-val BentoPurpleActiveOn = Color(0xFF11003D) // Dark violet text for active status
-val BentoLilacSecondary = Color(0xFFDDD2F0) // Lilac secondary container accent
-val BentoLilacSecondaryOn = Color(0xFF150F21) // Slate purple text for status
+// Existing screen references are retained as aliases while features migrate to semantic tokens.
+val ThemePurplePrimary = LibraryForest
+val ThemePurpleLight = LibrarySage
+val ThemeOnPrimary = Color.White
+val ThemeBackground = LibraryPaper
+val ThemeOnBackground = LibraryInk
+val ThemeSecondaryText = LibraryMuted
+val ThemeBorder = LibraryOutline
 
-// Semantic status highlights
-val StatusAvailableGreenText = Color(0xFF0A3622) // Saturated deep green
-val StatusAvailableGreenBg = Color(0xFFD1E7DD)
+// Secondary layout accents, now expressed with the EducLib editorial palette.
+val BentoPurpleActive = LibrarySageStrong
+val BentoPurpleActiveOn = LibraryForestDeep
+val BentoLilacSecondary = LibraryApricot
+val BentoLilacSecondaryOn = LibraryInk
 
-val StatusBorrowedAmberText = Color(0xFF4D3A02) // Saturated deep amber
-val StatusBorrowedAmberBg = Color(0xFFFFF3CD)
+// Semantic status highlights; status is also described in text, not only by color.
+val StatusAvailableGreenText = Color(0xFF14543D)
+val StatusAvailableGreenBg = Color(0xFFDCEEE3)
 
-val StatusOverdueRedText = Color(0xFF842029) // Strong dark crimson
-val StatusOverdueRedBg = Color(0xFFF8D7DA)
+val StatusBorrowedAmberText = Color(0xFF5A3A00)
+val StatusBorrowedAmberBg = Color(0xFFFFF0C2)
+
+val StatusOverdueRedText = Color(0xFF7C2430)
+val StatusOverdueRedBg = Color(0xFFF9E2E2)

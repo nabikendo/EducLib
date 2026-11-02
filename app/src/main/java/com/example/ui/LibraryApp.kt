@@ -644,8 +644,8 @@ fun GoogleSignChooserDialog(
                 )
 
                 val accounts = listOf(
-                    Triple("aluno@example.com", "Usuário de demonstração", "AF"),
-                    Triple("bibliotecario@example.com", "Bibliotecário de demonstração", "AB")
+                    Triple("aluno@example.com", "Usuário de demonstração", "UD"),
+                    Triple("bibliotecario@example.com", "Bibliotecário de demonstração", "BD")
                 )
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1016,7 +1016,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = userEmail ?: "escola@example.com",
+                                            text = userEmail ?: "usuario@example.com",
                                             fontSize = 10.sp,
                                             color = ThemeSecondaryText,
                                             maxLines = 1,
@@ -3737,7 +3737,7 @@ fun OverdueWhatsAppDialog(
                     value = phone,
                     onValueChange = { phone = it },
                     label = { Text("Número de Celular") },
-                    placeholder = { Text("Ex: NUMERO_REMOVIDO") },
+                    placeholder = { Text("Digite o número de celular") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -3974,7 +3974,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = userEmail ?: "escola@example.com",
+                                    text = userEmail ?: "usuario@example.com",
                                     fontSize = 10.sp,
                                     color = ThemeSecondaryText,
                                     maxLines = 1,
@@ -4214,7 +4214,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                             color = ThemeOnBackground
                         )
                         Text(
-                            text = userEmail ?: "escola@example.com",
+                            text = userEmail ?: "usuario@example.com",
                             fontSize = 12.sp,
                             color = ThemeSecondaryText
                         )

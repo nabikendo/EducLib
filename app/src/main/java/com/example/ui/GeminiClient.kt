@@ -24,7 +24,7 @@ object GeminiClient {
     suspend fun generateResponse(prompt: String, systemInstruction: String? = null): String = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.GEMINI_API_KEY
         if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
-            return@withContext "Para usar a IA, adicione a sua chave no painel de Secrets ou no arquivo .env."
+            return@withContext "A IA requer uma chave de desenvolvimento local em .env; não distribua APKs com chaves de cliente."
         }
 
         try {
@@ -64,7 +64,7 @@ object GeminiClient {
                 if (!response.isSuccessful) {
                     val code = response.code
                     if (code == 400 || code == 403) {
-                        return@withContext "Erro na API Gemini (Verifique se sua chave está configurada CORRETAMENTE no painel de Secrets). Código: $code"
+                        return@withContext "Erro na API Gemini (verifique a chave de desenvolvimento local). Código: $code"
                     }
                     return@withContext "Erro ao conectar com servidor do Gemini de IA. Código: $code"
                 }

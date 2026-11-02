@@ -199,14 +199,14 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                 ) {
                     Icon(
                         imageVector = Icons.Default.LocalLibrary,
-                        contentDescription = "BiblioTech",
+                        contentDescription = "EducLib",
                         tint = ThemePurplePrimary,
                         modifier = Modifier.size(30.dp)
                     )
                 }
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "BiblioTech",
+                    text = "EducLib",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.ExtraBold,
                     color = ThemePurplePrimary,
@@ -586,7 +586,7 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
 
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "BiblioTech • Conexão Local Segura ⚡",
+                    text = "EducLib • Conexão Local Segura ⚡",
                     fontSize = 11.sp,
                     color = ThemeSecondaryText.copy(alpha = 0.4f),
                     textAlign = TextAlign.Center
@@ -638,7 +638,7 @@ fun GoogleSignChooserDialog(
                 }
 
                 Text(
-                    text = "Selecione uma conta para continuar no BiblioTech:",
+                    text = "Selecione uma conta para continuar no EducLib:",
                     style = MaterialTheme.typography.bodySmall,
                     color = ThemeSecondaryText,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -755,7 +755,7 @@ fun GoogleSignChooserDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Para continuar, o Google compartilhará seu nome, e-mail e foto de perfil com o BiblioTech.",
+                    text = "Para continuar, o Google compartilhará seu nome, e-mail e foto de perfil com o EducLib.",
                     fontSize = 10.sp,
                     color = ThemeSecondaryText,
                     textAlign = TextAlign.Center
@@ -864,7 +864,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "BiblioTech",
+                                    text = "EducLib",
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = ThemeOnBackground
@@ -939,7 +939,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         )
 
                         NavigationDrawerItem(
-                            label = { Text("Gestão JTA & ROOF") },
+                            label = { Text("Análises do acervo") },
                             selected = selectedTab == 4 && !isAddingBookRoute && bookToEdit == null,
                             onClick = {
                                 selectedTab = 4
@@ -1065,7 +1065,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         }
 
                         Text(
-                            text = "BiblioTech v1.2",
+                            text = "EducLib · Biblioteca escolar",
                             style = MaterialTheme.typography.labelSmall,
                             color = ThemeSecondaryText,
                             modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -1176,7 +1176,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                                 bookToEdit = null
                             },
                             icon = { Icon(Icons.Default.Insights, contentDescription = "Análises") },
-                            label = { Text("JTA & ROOF") },
+                            label = { Text("Análises") },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = ThemePurplePrimary,
                                 selectedTextColor = ThemeOnBackground,
@@ -1278,6 +1278,18 @@ fun CollectionAvailabilityCard(
 ) {
     val fillPercentage = if (totalCopies > 0) availableCopies.toFloat() / totalCopies else 0f
     val displayPercentage = (fillPercentage * 100).toInt()
+    val availabilityMessage = when {
+        totalCopies == 0 -> "Cadastre exemplares para começar"
+        availableCopies == 0 -> "Nenhum exemplar disponível"
+        displayPercentage < 50 -> "Poucas cópias disponíveis"
+        else -> "Boa disponibilidade no acervo"
+    }
+    val availabilityColor = when {
+        totalCopies == 0 -> ThemeSecondaryText
+        availableCopies == 0 -> StatusOverdueRedText
+        displayPercentage < 50 -> StatusBorrowedAmberText
+        else -> StatusAvailableGreenText
+    }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -1295,7 +1307,7 @@ fun CollectionAvailabilityCard(
             Column(modifier = Modifier.weight(1.3f)) {
                 Text(
                     text = "DISPONIBILIDADE DO ACERVO",
-                    fontSize = 11.sp,
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = ThemePurplePrimary,
                     letterSpacing = 0.5.sp
@@ -1309,9 +1321,9 @@ fun CollectionAvailabilityCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Taxa de circulação saudável de ${100 - displayPercentage}%",
+                    text = availabilityMessage,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (displayPercentage < 50) StatusOverdueRedText else StatusAvailableGreenText,
+                    color = availabilityColor,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -1350,10 +1362,10 @@ fun CollectionAvailabilityCard(
                         color = ThemeOnBackground
                     )
                     Text(
-                        text = "livre",
-                        fontSize = 9.sp,
+                        text = "livres",
+                        fontSize = 11.sp,
                         color = ThemeSecondaryText,
-                        lineHeight = 9.sp
+                        lineHeight = 14.sp
                     )
                 }
             }
@@ -1431,7 +1443,7 @@ fun BentoStats(
                     ) {
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                             Text(
-                                text = "EMPRESTADOS",
+                                text = "EMPRÉSTIMOS ATIVOS",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = BentoLilacSecondaryOn,
@@ -1449,7 +1461,7 @@ fun BentoStats(
                                     color = BentoLilacSecondaryOn
                                 )
                                 Text(
-                                    text = "/${books.size} títulos",
+                                    text = "em circulação",
                                     fontSize = 11.sp,
                                     color = ThemeSecondaryText,
                                     modifier = Modifier.padding(bottom = 4.dp)
@@ -1521,7 +1533,7 @@ fun BentoStats(
                         ) {
                             Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                                 Text(
-                                    text = "EMPRESTADOS",
+                                    text = "EMPRÉSTIMOS ATIVOS",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = BentoLilacSecondaryOn,
@@ -1539,7 +1551,7 @@ fun BentoStats(
                                         color = BentoLilacSecondaryOn
                                     )
                                     Text(
-                                        text = "/${books.size} t.",
+                                        text = "ativos",
                                         fontSize = 11.sp,
                                         color = ThemeSecondaryText,
                                         modifier = Modifier.padding(bottom = 2.dp)
@@ -1705,6 +1717,7 @@ fun CatalogTab(
     val shelves by viewModel.shelves.collectAsStateWithLifecycle()
     val positions by viewModel.positions.collectAsStateWithLifecycle()
     val suggestions by viewModel.suggestions.collectAsStateWithLifecycle()
+    val userName by viewModel.userName.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var showDialogForLoanBook by remember { mutableStateOf<BookEntity?>(null) }
@@ -1760,124 +1773,38 @@ fun CatalogTab(
                 .fillMaxSize()
                 .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
-        // 1. Header Details
+        // 1. Boas-vindas e estado do acervo
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-            val isTablet = LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600
-            if (isTablet) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(ThemePurplePrimary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MenuBook,
-                                contentDescription = "Ícone BiblioTech",
-                                tint = Color.White
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Acervo Geral",
-                                style = MaterialTheme.typography.headlineLarge,
-                                color = ThemePurplePrimary,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Gerencie e consulte o inventário local da biblioteca.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = ThemeSecondaryText,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        Button(
-                            onClick = onAddBookClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.testTag("add_book_button_header")
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Novo Livro")
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Adicionar Livro", fontSize = 14.sp)
-                        }
-                    }
-                }
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(ThemePurplePrimary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MenuBook,
-                                contentDescription = "Ícone BiblioTech",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Acervo Geral",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = ThemePurplePrimary,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Gerencie e consulte o inventário local da biblioteca.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = ThemeSecondaryText
-                            )
-                        }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = onAddBookClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.testTag("add_book_button_header")
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Novo Livro", modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Adicionar Livro", fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
+            val isTablet = context.resources.configuration.smallestScreenWidthDp >= 600
+            LibraryWelcomeHeader(
+                userName = userName,
+                bookCount = books.size,
+                onAddBook = if (isTablet) onAddBookClick else null
+            )
         }
 
-        // 2. Bento Style Stats Overview
+        // 2. Busca e leitura de código: ações prioritárias do catálogo
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            LibrarySearchToolbar(
+                query = searchQuery,
+                onQueryChange = viewModel::searchBooks,
+                onScan = {
+                    barcodeLauncher.launch(
+                        ScanOptions().apply {
+                            setOrientationLocked(false)
+                            setPrompt("Aponte para o código do livro")
+                        }
+                    )
+                }
+            )
+        }
+
+        // 3. Métricas do acervo
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
             BentoStats(books = books, loans = loans, onInsightsClick = { showInsightsDialog = true })
         }
 
-        // 2.5 Weekly Suggestions Group
+        // 4. Recomendações da semana
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
             WeeklySuggestionsSection(
                 suggestions = suggestions,
@@ -1891,117 +1818,65 @@ fun CatalogTab(
             )
         }
 
-        // 3. Search and Scanner Row
+        // 5. Ordenar resultados com chips acessíveis e rolagem horizontal
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Large high-contrast search input
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.searchBooks(it) },
-                    placeholder = { Text("Buscar por título, autor, gênero ou prateleira...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ThemeSecondaryText) },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.searchBooks("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("search_books_input"),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ThemePurplePrimary,
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedLabelColor = ThemePurplePrimary
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                // Station Scanner button
-                IconButton(
-                    onClick = { barcodeLauncher.launch(ScanOptions().apply { setOrientationLocked(false); setPrompt("Aponte para o código do livro") }) },
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(ThemePurpleLight)
-                        .testTag("scanner_station_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.QrCodeScanner,
-                        contentDescription = "Scanner de Estação",
-                        tint = ThemePurplePrimary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-        }
-
-        // 4. Premium Compact Sort Row
-        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Sort,
-                        contentDescription = "Ordenar",
+                        contentDescription = null,
                         tint = ThemeSecondaryText,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                     Text(
-                        text = "Ordenar por:",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
+                        text = "Ordenar resultados",
+                        style = MaterialTheme.typography.titleSmall,
                         color = ThemeSecondaryText
                     )
                 }
-                
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScrollWithKeyboard(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val sortingOptions = listOf(
-                        "A-Z" to "Título (A-Z)",
+                        "A-Z" to "Título (A–Z)",
                         "Autor" to "Autores",
-                        "Ano" to "Mais Novos",
+                        "Ano" to "Mais novos",
                         "Disponíveis" to "Disponíveis"
                     )
                     sortingOptions.forEach { (key, title) ->
-                        val isSelected = (sortBy == key)
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (isSelected) ThemePurplePrimary else ThemePurpleLight.copy(alpha = 0.5f))
-                                .clickable { sortBy = key }
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
-                        ) {
-                            Text(
-                                text = title,
-                                fontSize = 10.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) Color.White else ThemePurplePrimary
+                        FilterChip(
+                            selected = sortBy == key,
+                            onClick = { sortBy = key },
+                            label = { Text(title, style = MaterialTheme.typography.labelMedium) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = ThemePurplePrimary,
+                                selectedLabelColor = Color.White,
+                                containerColor = ThemePurpleLight,
+                                labelColor = ThemePurplePrimary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = sortBy == key,
+                                selectedBorderColor = Color.Transparent,
+                                borderColor = ThemeBorder
                             )
-                        }
+                        )
                     }
                 }
             }
         }
 
-        // 5. Horizontal scrollable genre filter chips
+        // 6. Filtros por gênero
         if (genres.size > 1) {
             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
                 Row(
@@ -2043,7 +1918,7 @@ fun CatalogTab(
             }
         }
 
-        // 6. Content Section (Empty state or Book list items)
+        // 7. Conteúdo do acervo
         if (filteredBooks.isEmpty()) {
             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
                 Box(
@@ -2057,7 +1932,7 @@ fun CatalogTab(
                             modifier = Modifier
                                 .size(64.dp)
                                 .clip(RoundedCornerShape(32.dp))
-                                .background(ThemeBorder),
+                                .background(LibrarySurfaceAlt),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -2723,7 +2598,7 @@ fun LoanBookDialog(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(RoundedCornerShape(18.dp))
-                                    .background(if (quantityToLoan > 1) ThemePurplePrimary else ThemeBorder)
+                                    .background(if (quantityToLoan > 1) ThemePurplePrimary else LibrarySurfaceAlt)
                                     .clickable(enabled = quantityToLoan > 1) { quantityToLoan-- },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -3137,7 +3012,7 @@ fun LoansTab(viewModel: LibraryViewModel) {
                                 modifier = Modifier
                                     .size(64.dp)
                                     .clip(RoundedCornerShape(32.dp))
-                                    .background(ThemeBorder),
+                                    .background(LibrarySurfaceAlt),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -3205,7 +3080,7 @@ fun LoansTab(viewModel: LibraryViewModel) {
                                 modifier = Modifier
                                     .size(64.dp)
                                     .clip(RoundedCornerShape(32.dp))
-                                    .background(ThemeBorder),
+                                    .background(LibrarySurfaceAlt),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -3503,7 +3378,7 @@ fun LoanCard(
                             }
                             
                             val text = """
-                                📚 *BiblioTech - Comprovante de Empréstimo* 📚
+                                📚 *EducLib - Comprovante de Empréstimo* 📚
                                 
                                 👤 *Leitor:* ${loan.borrowerName} (${loan.borrowerClass})
                                 📖 *Livro:* "${loan.bookTitle}" (por ${loan.bookAuthor})
@@ -5818,7 +5693,7 @@ fun BorrowersTab(viewModel: LibraryViewModel) {
                             modifier = Modifier
                                 .size(64.dp)
                                 .clip(RoundedCornerShape(32.dp))
-                                .background(ThemeBorder),
+                                .background(LibrarySurfaceAlt),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -6496,7 +6371,7 @@ fun BorrowerDetailsDialog(
                             }
                             
                             val text = """
-                                📝 *BiblioTech - Situação de Leitor* 📝
+                                📝 *EducLib - Situação de Leitor* 📝
                                 
                                 👤 *Nome:* ${borrower.name}
                                 🏢 *Tipo/Vínculo:* ${borrower.type}
@@ -6954,7 +6829,7 @@ fun BookDetailsDialog(
                             }
                             
                             val text = """
-                                📖 *BiblioTech - Informações de Livro* 📖
+                                📖 *EducLib - Informações de Livro* 📖
                                 
                                 📌 *Título:* ${book.title}
                                 👤 *Autor:* ${book.author}
@@ -8524,7 +8399,7 @@ fun ReservationCard(
                                 onClick = {
                                     try {
                                         val number = borrowerPhone.replace(Regex("[^0-9]"), "")
-                                        val text = "Olá ${reservation.borrowerName}, o livro '${reservation.bookTitle}' que você reservou na BiblioTech já está disponível! Por favor, venha retirá-lo o mais breve possível para não perder a reserva."
+                                        val text = "Olá ${reservation.borrowerName}, o livro '${reservation.bookTitle}' que você reservou na EducLib já está disponível! Por favor, venha retirá-lo o mais breve possível para não perder a reserva."
                                         val url = "https://api.whatsapp.com/send?phone=55$number&text=${java.net.URLEncoder.encode(text, "UTF-8")}"
                                         val intent = Intent(Intent.ACTION_VIEW).apply {
                                             data = android.net.Uri.parse(url)
@@ -8687,7 +8562,7 @@ fun CarteirinhaDialog(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "BiblioTech",
+                            text = "EducLib",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = ThemePurplePrimary
@@ -8833,7 +8708,7 @@ fun CarteirinhaDialog(
                     OutlinedButton(
                         onClick = {
                             val text = """
-                                🆔 *CARTEIRINHA DIGITAL - BiblioTech* 🆔
+                                🆔 *CARTEIRINHA DIGITAL - EducLib* 🆔
                                 
                                 👤 *Leitor:* ${borrower.name}
                                 📞 *Contato:* ${borrower.phone.ifBlank { "Não informado" }}

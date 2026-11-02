@@ -82,6 +82,7 @@ fun LibraryApp(viewModel: LibraryViewModel) {
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
 
     MyApplicationTheme {
+        AppUpdatePrompt()
         Box(modifier = Modifier.fillMaxSize()) {
             when (isPasswordSet) {
                 null -> {

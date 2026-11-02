@@ -1,6 +1,6 @@
 # EducLib — Biblioteca Escolar
 
-Aplicativo Android para apoiar a gestão de uma biblioteca escolar, desenvolvido em Kotlin e Jetpack Compose. O app usa armazenamento local com Room e inclui recursos de consulta de livros e controle de empréstimos.
+Aplicativo Android para apoiar a gestão de uma biblioteca escolar, desenvolvido em Kotlin e Jetpack Compose. O app abre sem conta ou senha e guarda os registros localmente com Room, com recursos de consulta de livros e controle de empréstimos.
 
 ## Requisitos
 
@@ -9,6 +9,10 @@ Aplicativo Android para apoiar a gestão de uma biblioteca escolar, desenvolvido
 - Android 7.0 (API 24) ou superior para instalar o app.
 
 Abra a pasta do repositório no Android Studio, aguarde a sincronização do Gradle e execute o app em um emulador ou dispositivo. Pela linha de comando, com Gradle instalado, use `gradle assembleDebug`.
+
+## Uso sem conta e dados locais
+
+Não é necessário criar conta nem lembrar uma senha para usar o EducLib. Livros, leitores e empréstimos ficam armazenados no aparelho; antes de trocar de dispositivo, use a opção de backup nas configurações para exportar os dados.
 
 ## Chave Gemini e segurança
 

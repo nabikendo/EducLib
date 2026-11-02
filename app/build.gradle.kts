@@ -14,8 +14,8 @@ android {
     applicationId = "com.aistudio.biblioteca.vwtpxn"
     minSdk = 24
     targetSdk = 36
-    versionCode = 18
-    versionName = "16.2.0"
+    versionCode = 19
+    versionName = "16.3.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

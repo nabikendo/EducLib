@@ -3,22 +3,22 @@ package com.example.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * EducLib visual system: an editorial library palette built around warm paper,
- * forest ink and a restrained terracotta accent.
+ * Minimal EducLib palette: soft sage surfaces, warm paper backgrounds and
+ * dark, readable ink for comfortable everyday use.
  */
-val LibraryForest = Color(0xFF124B3E)
-val LibraryForestDeep = Color(0xFF0B3028)
-val LibrarySage = Color(0xFFE3EEE8)
-val LibrarySageStrong = Color(0xFFD5E7DD)
-val LibraryPaper = Color(0xFFF8F6F0)
+val LibraryForest = Color(0xFF5C7D70)
+val LibraryForestDeep = Color(0xFF354F44)
+val LibrarySage = Color(0xFFE7EFE9)
+val LibrarySageStrong = Color(0xFFD7E5DC)
+val LibraryPaper = Color(0xFFF7F7F3)
 val LibrarySurface = Color(0xFFFFFFFF)
-val LibrarySurfaceAlt = Color(0xFFEEF1EC)
-val LibraryInk = Color(0xFF172521)
-val LibraryMuted = Color(0xFF40544C)
+val LibrarySurfaceAlt = Color(0xFFEDF2EF)
+val LibraryInk = Color(0xFF273630)
+val LibraryMuted = Color(0xFF50635A)
 val LibraryOutline = Color(0xFF7D8B83)
 val LibraryControlOutline = Color(0xFF66766E)
-val LibraryTerracotta = Color(0xFF91442F)
-val LibraryApricot = Color(0xFFF7E5DA)
+val LibraryTerracotta = Color(0xFF866758)
+val LibraryApricot = Color(0xFFF3EAE4)
 
 // Existing screen references are retained as aliases while features migrate to semantic tokens.
 val ThemePurplePrimary = LibraryForest
@@ -29,18 +29,18 @@ val ThemeOnBackground = LibraryInk
 val ThemeSecondaryText = LibraryMuted
 val ThemeBorder = LibraryOutline
 
-// Secondary layout accents, now expressed with the EducLib editorial palette.
+// Secondary layout accents, expressed with the softened EducLib palette.
 val BentoPurpleActive = LibrarySageStrong
 val BentoPurpleActiveOn = LibraryForestDeep
 val BentoLilacSecondary = LibraryApricot
 val BentoLilacSecondaryOn = LibraryInk
 
-// Semantic status highlights; status is also described in text, not only by color.
-val StatusAvailableGreenText = Color(0xFF14543D)
-val StatusAvailableGreenBg = Color(0xFFDCEEE3)
+// Status is always conveyed with text as well as color.
+val StatusAvailableGreenText = Color(0xFF486E59)
+val StatusAvailableGreenBg = Color(0xFFE2EEE5)
 
-val StatusBorrowedAmberText = Color(0xFF5A3A00)
-val StatusBorrowedAmberBg = Color(0xFFFFF0C2)
+val StatusBorrowedAmberText = Color(0xFF765C2F)
+val StatusBorrowedAmberBg = Color(0xFFF5ECD7)
 
-val StatusOverdueRedText = Color(0xFF7C2430)
-val StatusOverdueRedBg = Color(0xFFF9E2E2)
+val StatusOverdueRedText = Color(0xFF7C5057)
+val StatusOverdueRedBg = Color(0xFFF3E4E6)

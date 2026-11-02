@@ -75,34 +75,11 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun LibraryApp(viewModel: LibraryViewModel) {
-    val isPasswordSet by viewModel.isPasswordSet.collectAsStateWithLifecycle()
-    val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
-
     MyApplicationTheme {
         AppUpdatePrompt()
-        Box(modifier = Modifier.fillMaxSize()) {
-            when (isPasswordSet) {
-                null -> {
-                    // Loading initial state from Room database config table
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = ThemePurplePrimary)
-                    }
-                }
-                false -> {
-                    UnifiedAuthScreen(viewModel = viewModel, isSetupMode = true)
-                }
-                true -> {
-                    if (isLoggedIn) {
-                        MainLibraryAppContent(viewModel)
-                    } else {
-                        UnifiedAuthScreen(viewModel = viewModel, isSetupMode = false)
-                    }
-                }
-            }
-        }
+        MainLibraryAppContent(viewModel)
     }
 }
 
@@ -824,6 +801,10 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
     var isAddingBookRoute by rememberSaveable { mutableStateOf(false) }
     var bookToEdit by remember { mutableStateOf<BookEntity?>(null) }
 
+    LaunchedEffect(selectedTab) {
+        if (selectedTab !in 0..3) selectedTab = 0
+    }
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isTablet = maxWidth > 600.dp
 
@@ -939,26 +920,6 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         )
 
                         NavigationDrawerItem(
-                            label = { Text("Análises do acervo") },
-                            selected = selectedTab == 4 && !isAddingBookRoute && bookToEdit == null,
-                            onClick = {
-                                selectedTab = 4
-                                isAddingBookRoute = false
-                                bookToEdit = null
-                            },
-                            icon = { Icon(Icons.Default.Insights, contentDescription = null) },
-                            colors = NavigationDrawerItemDefaults.colors(
-                                selectedContainerColor = BentoLilacSecondary,
-                                selectedTextColor = BentoLilacSecondaryOn,
-                                selectedIconColor = ThemePurplePrimary,
-                                unselectedTextColor = ThemeSecondaryText,
-                                unselectedIconColor = ThemeSecondaryText
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        NavigationDrawerItem(
                             label = { Text("Configurações & Backup") },
                             selected = selectedTab == 3 && !isAddingBookRoute && bookToEdit == null,
                             onClick = {
@@ -980,92 +941,29 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
 
                         Spacer(modifier = Modifier.weight(1f))
 
-                        val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
-                        val userName by viewModel.userName.collectAsStateWithLifecycle()
-                        val loginMethod by viewModel.loginMethod.collectAsStateWithLifecycle()
-
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = ThemePurpleLight.copy(alpha = 0.4f)),
-                            border = BorderStroke(1.dp, ThemePurpleLight),
+                            colors = CardDefaults.cardColors(containerColor = LibrarySage),
+                            border = BorderStroke(1.dp, ThemeBorder.copy(alpha = 0.45f)),
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(ThemePurplePrimary),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = userName?.take(2)?.uppercase() ?: "AD",
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = userName ?: "Administrador",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
-                                            color = ThemeOnBackground,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = userEmail ?: "usuario@example.com",
-                                            fontSize = 10.sp,
-                                            color = ThemeSecondaryText,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                val badgeText = when (loginMethod) {
-                                    "google" -> "Via Google ✨"
-                                    "email" -> "Via E-mail 📧"
-                                    else -> "Senha Mestre 🔑"
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(BentoLilacSecondary)
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = badgeText,
-                                            fontSize = 9.sp,
-                                            color = ThemePurplePrimary,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { viewModel.logout() },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Logout,
-                                            contentDescription = "Sair",
-                                            tint = Color.Red.copy(alpha = 0.7f),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = "Acesso sem conta",
+                                    fontWeight = FontWeight.Bold,
+                                    color = ThemeOnBackground
+                                )
+                                Text(
+                                    text = "Seus dados ficam guardados neste aparelho.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ThemeSecondaryText,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
                             }
                         }
 
                         Text(
-                            text = "EducLib · Biblioteca escolar",
+                            text = "EducLib · por @nabikendo",
                             style = MaterialTheme.typography.labelSmall,
                             color = ThemeSecondaryText,
                             modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -1169,24 +1067,6 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         )
 
                         NavigationBarItem(
-                            selected = selectedTab == 4 && !isAddingBookRoute && bookToEdit == null,
-                            onClick = {
-                                selectedTab = 4
-                                isAddingBookRoute = false
-                                bookToEdit = null
-                            },
-                            icon = { Icon(Icons.Default.Insights, contentDescription = "Análises") },
-                            label = { Text("Análises") },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = ThemePurplePrimary,
-                                selectedTextColor = ThemeOnBackground,
-                                indicatorColor = BentoLilacSecondary,
-                                unselectedIconColor = ThemeSecondaryText,
-                                unselectedTextColor = ThemeSecondaryText
-                            )
-                        )
-
-                        NavigationBarItem(
                             selected = selectedTab == 3 && !isAddingBookRoute && bookToEdit == null,
                             onClick = {
                                 selectedTab = 3
@@ -1230,6 +1110,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
     }
 }
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun RenderScreen(
     selectedTab: Int,
@@ -1240,29 +1121,42 @@ fun RenderScreen(
     onEditBookRoute: (BookEntity) -> Unit,
     onBack: () -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        when {
-            isAdding -> {
-                AddEditBookScreen(
-                    bookToEdit = null,
-                    viewModel = viewModel,
-                    onBack = onBack
-                )
-            }
-            editingBook != null -> {
-                AddEditBookScreen(
-                    bookToEdit = editingBook,
-                    viewModel = viewModel,
-                    onBack = onBack
-                )
-            }
-            else -> {
-                when (selectedTab) {
-                    0 -> CatalogTab(viewModel, onAddBookRoute, onEditBookRoute)
-                    1 -> LoansTab(viewModel)
-                    2 -> BorrowersTab(viewModel)
-                    3 -> SettingsTab(viewModel)
-                    4 -> JtaRoofTab(viewModel)
+    val route = remember(selectedTab, isAdding, editingBook) {
+        Triple(selectedTab, isAdding, editingBook)
+    }
+
+    AnimatedContent(
+        targetState = route,
+        transitionSpec = {
+            fadeIn(animationSpec = tween(durationMillis = 180)) togetherWith
+                fadeOut(animationSpec = tween(durationMillis = 140))
+        },
+        label = "educLib_screen_transition"
+    ) { targetRoute ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            when {
+                targetRoute.second -> {
+                    AddEditBookScreen(
+                        bookToEdit = null,
+                        viewModel = viewModel,
+                        onBack = onBack
+                    )
+                }
+                targetRoute.third != null -> {
+                    AddEditBookScreen(
+                        bookToEdit = targetRoute.third,
+                        viewModel = viewModel,
+                        onBack = onBack
+                    )
+                }
+                else -> {
+                    when (targetRoute.first) {
+                        0 -> CatalogTab(viewModel, onAddBookRoute, onEditBookRoute)
+                        1 -> LoansTab(viewModel)
+                        2 -> BorrowersTab(viewModel)
+                        3 -> SettingsTab(viewModel)
+                        else -> CatalogTab(viewModel, onAddBookRoute, onEditBookRoute)
+                    }
                 }
             }
         }
@@ -1716,257 +1610,112 @@ fun CatalogTab(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val shelves by viewModel.shelves.collectAsStateWithLifecycle()
     val positions by viewModel.positions.collectAsStateWithLifecycle()
-    val suggestions by viewModel.suggestions.collectAsStateWithLifecycle()
-    val userName by viewModel.userName.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var showDialogForLoanBook by remember { mutableStateOf<BookEntity?>(null) }
     var showBookDetailsDialog by remember { mutableStateOf<BookEntity?>(null) }
-    var showInsightsDialog by remember { mutableStateOf(false) }
-    var showScanner by remember { mutableStateOf(false) }
-    var showFichaEtiquetaForBook by remember { mutableStateOf<BookEntity?>(null) }
-
 
     val barcodeLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
-        if (result.contents != null) {
-            viewModel.searchBooks(result.contents)
-        }
+        if (result.contents != null) viewModel.searchBooks(result.contents)
     }
+    val orderedBooks = remember(books) { books.sortedBy { it.title.lowercase() } }
+    val isTablet = context.resources.configuration.smallestScreenWidthDp >= 600
+    val gridCells = if (isTablet) GridCells.Adaptive(minSize = 300.dp) else GridCells.Fixed(1)
 
-    val genres = remember(books) {
-        val list = books.map { it.genre.trim().ifBlank { "Sem Gênero" } }.distinct().sortedWith(String.CASE_INSENSITIVE_ORDER)
-        listOf("Todos") + list
-    }
-    var selectedGenre by rememberSaveable { mutableStateOf("Todos") }
-    var sortBy by rememberSaveable { mutableStateOf("A-Z") }
-
-    val filteredBooks = remember(books, selectedGenre, sortBy) {
-        val filtered = if (selectedGenre == "Todos") {
-            books
-        } else {
-            books.filter { it.genre.trim().ifBlank { "Sem Gênero" }.equals(selectedGenre, ignoreCase = true) }
-        }
-        
-        when (sortBy) {
-            "A-Z" -> filtered.sortedBy { it.title.lowercase() }
-            "Autor" -> filtered.sortedBy { it.author.lowercase() }
-            "Ano" -> filtered.sortedByDescending { it.year }
-            "Disponíveis" -> filtered.sortedByDescending { it.availableQuantity }
-            else -> filtered
-        }
-    }
-
-    // Adaptive Grid based on device width
-    val gridCells = if (LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600) {
-        GridCells.Adaptive(minSize = 300.dp)
-    } else {
-        GridCells.Fixed(1)
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyVerticalGrid(
-            columns = gridCells,
-            contentPadding = PaddingValues(bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 20.dp)
-        ) {
-        // 1. Boas-vindas e estado do acervo
+    LazyVerticalGrid(
+        columns = gridCells,
+        contentPadding = PaddingValues(bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp, vertical = 20.dp)
+    ) {
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-            val isTablet = context.resources.configuration.smallestScreenWidthDp >= 600
             LibraryWelcomeHeader(
-                userName = userName,
                 bookCount = books.size,
+                hasSearch = searchQuery.isNotBlank(),
                 onAddBook = if (isTablet) onAddBookClick else null
             )
         }
 
-        // 2. Busca e leitura de código: ações prioritárias do catálogo
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
             LibrarySearchToolbar(
                 query = searchQuery,
-                onQueryChange = viewModel::searchBooks,
+                onQueryChange = { viewModel.searchBooks(it) },
                 onScan = {
                     barcodeLauncher.launch(
                         ScanOptions().apply {
                             setOrientationLocked(false)
-                            setPrompt("Aponte para o código do livro")
+                            setPrompt("Aponte a câmera para o código do livro")
                         }
                     )
                 }
             )
         }
 
-        // 3. Métricas do acervo
-        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-            BentoStats(books = books, loans = loans, onInsightsClick = { showInsightsDialog = true })
-        }
-
-        // 4. Recomendações da semana
-        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-            WeeklySuggestionsSection(
-                suggestions = suggestions,
-                allBooks = books,
-                onAddSuggestion = { bookId, title, author, profName, classRoom, rec ->
-                    viewModel.addSuggestion(context, bookId, title, author, profName, classRoom, rec)
-                },
-                onRemoveSuggestion = { suggestion ->
-                    viewModel.removeSuggestion(context, suggestion)
-                }
-            )
-        }
-
-        // 5. Ordenar resultados com chips acessíveis e rolagem horizontal
-        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Sort,
-                        contentDescription = null,
-                        tint = ThemeSecondaryText,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "Ordenar resultados",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = ThemeSecondaryText
-                    )
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScrollWithKeyboard(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val sortingOptions = listOf(
-                        "A-Z" to "Título (A–Z)",
-                        "Autor" to "Autores",
-                        "Ano" to "Mais novos",
-                        "Disponíveis" to "Disponíveis"
-                    )
-                    sortingOptions.forEach { (key, title) ->
-                        FilterChip(
-                            selected = sortBy == key,
-                            onClick = { sortBy = key },
-                            label = { Text(title, style = MaterialTheme.typography.labelMedium) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = ThemePurplePrimary,
-                                selectedLabelColor = Color.White,
-                                containerColor = ThemePurpleLight,
-                                labelColor = ThemePurplePrimary
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = sortBy == key,
-                                selectedBorderColor = Color.Transparent,
-                                borderColor = ThemeBorder
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        // 6. Filtros por gênero
-        if (genres.size > 1) {
+        if (orderedBooks.isEmpty()) {
             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScrollWithKeyboard(rememberScrollState())
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, ThemeBorder.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    genres.forEach { genre ->
-                        val isSelected = (genre == selectedGenre)
-                        val count = remember(books, genre) {
-                            if (genre == "Todos") {
-                                books.size
-                            } else {
-                                books.count { it.genre.trim().ifBlank { "Sem Gênero" }.equals(genre, ignoreCase = true) }
-                            }
-                        }
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { selectedGenre = genre },
-                            label = { Text("$genre ($count)") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = ThemePurplePrimary,
-                                selectedLabelColor = Color.White,
-                                containerColor = ThemePurpleLight,
-                                labelColor = ThemePurplePrimary
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = isSelected,
-                                selectedBorderColor = Color.Transparent,
-                                borderColor = ThemeBorder
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        // 7. Conteúdo do acervo
-        if (filteredBooks.isEmpty()) {
-            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Box(
                             modifier = Modifier
-                                .size(64.dp)
-                                .clip(RoundedCornerShape(32.dp))
-                                .background(LibrarySurfaceAlt),
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(LibrarySage),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.MenuBook,
-                                contentDescription = null,
-                                tint = ThemeSecondaryText,
-                                modifier = Modifier.size(32.dp)
-                            )
+                            Icon(Icons.Default.MenuBook, contentDescription = null, tint = LibraryForest, modifier = Modifier.size(28.dp))
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = if (selectedGenre != "Todos") "Nenhum livro neste gênero" else "Nenhum livro encontrado",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = ThemePurplePrimary,
-                            fontWeight = FontWeight.Bold
+                            text = if (searchQuery.isBlank()) "Seu acervo começa aqui" else "Não encontramos esse livro",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = ThemeOnBackground,
+                            textAlign = TextAlign.Center
                         )
                         Text(
-                            text = if (selectedGenre != "Todos") "Experimente selecionar outro gênero ou prateleira." else "Experimente adicionar um livro ou ajustar a busca.",
+                            text = if (searchQuery.isBlank()) "Cadastre o primeiro livro para organizar sua biblioteca." else "Tente outro título ou autor, ou limpe a busca.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = ThemeSecondaryText,
-                            modifier = Modifier.padding(top = 2.dp)
+                            textAlign = TextAlign.Center
                         )
+                        if (searchQuery.isBlank()) {
+                            Button(
+                                onClick = onAddBookClick,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Cadastrar primeiro livro")
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = { viewModel.searchBooks("") },
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Text("Limpar busca")
+                            }
+                        }
                     }
                 }
             }
         } else {
-            items(filteredBooks) { book ->
+            items(orderedBooks) { book ->
                 val shelfLocationText = remember(book.posicaoEstanteId, shelves, positions) {
                     if (book.posicaoEstanteId != null) {
-                        val pos = positions.find { it.id == book.posicaoEstanteId }
-                        val sh = shelves.find { it.id == pos?.shelfId }
-                        if (sh != null && pos != null) {
-                            "${sh.name} • ${pos.coordinate}"
-                        } else null
+                        val position = positions.find { it.id == book.posicaoEstanteId }
+                        val shelf = shelves.find { it.id == position?.shelfId }
+                        if (shelf != null && position != null) "${shelf.name} • ${position.coordinate}" else null
                     } else null
                 }
                 val isOverdue = remember(loans, book.id) {
@@ -1980,8 +1729,8 @@ fun CatalogTab(
                     onDelete = {
                         AlertDialogHelper.showConfirmDialog(
                             context = context,
-                            title = "Excluir Livro",
-                            message = "Deseja realmente excluir \"${book.title}\"? Isso removerá as referências de estoque local.",
+                            title = "Excluir livro",
+                            message = "Deseja realmente excluir ‘${book.title}’?",
                             onConfirm = { viewModel.deleteBook(context, book) }
                         )
                     },
@@ -1991,9 +1740,7 @@ fun CatalogTab(
             }
         }
     }
-    }
 
-    // Loan Dialog Trigger
     showDialogForLoanBook?.let { book ->
         LoanBookDialog(
             book = book,
@@ -2004,7 +1751,7 @@ fun CatalogTab(
                     if (success) {
                         Toast.makeText(context, "Empréstimo registrado com sucesso!", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(context, "Erro: Não há exemplares suficientes disponíveis!", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Não há exemplares suficientes disponíveis.", Toast.LENGTH_LONG).show()
                     }
                 }
                 showDialogForLoanBook = null
@@ -2012,7 +1759,6 @@ fun CatalogTab(
         )
     }
 
-    // Rich Book Details Dialog Trigger
     showBookDetailsDialog?.let { book ->
         BookDetailsDialog(
             book = book,
@@ -2022,35 +1768,9 @@ fun CatalogTab(
                 onEditBookClick(book)
                 showBookDetailsDialog = null
             },
-            onLoan = {
-                showDialogForLoanBook = book
-            }
+            onLoan = { showDialogForLoanBook = book }
         )
     }
-
-    if (showInsightsDialog) {
-        LibraryInsightsDialog(
-            books = books,
-            loans = loans,
-            onDismiss = { showInsightsDialog = false }
-        )
-    }
-
-    if (showScanner) {
-        ScannerDialog(
-            viewModel = viewModel,
-            onDismiss = { showScanner = false }
-        )
-    }
-
-    showFichaEtiquetaForBook?.let { book ->
-        FichaEtiquetaDialog(
-            book = book,
-            onDismiss = { showFichaEtiquetaForBook = null }
-        )
-    }
-
-
 }
 
 @Composable
@@ -2063,22 +1783,24 @@ fun BookCard(
     onLoan: () -> Unit,
     onCardClick: () -> Unit
 ) {
+    var showBookActions by remember(book.id) { mutableStateOf(false) }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(170.dp)
-            .clickable { onCardClick() }
+            .heightIn(min = 190.dp)
+            .clickable(onClickLabel = "Ver detalhes de ${book.title}") { onCardClick() }
             .testTag("book_card_${book.title}"),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, ThemeBorder),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Row(modifier = Modifier.fillMaxSize()) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             // Left panel: Book Photo
             Box(
                 modifier = Modifier
                     .width(110.dp)
-                    .fillMaxHeight()
+                    .height(190.dp)
                     .background(ThemeBackground),
                 contentAlignment = Alignment.Center
             ) {
@@ -2112,7 +1834,7 @@ fun BookCard(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = book.genre.take(8),
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             color = ThemeSecondaryText,
                             fontWeight = FontWeight.Bold
                         )
@@ -2124,7 +1846,7 @@ fun BookCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight()
+                    .heightIn(min = 190.dp)
                     .padding(12.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
@@ -2139,26 +1861,42 @@ fun BookCard(
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
                             color = ThemeOnBackground,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
 
-                        // Quick action menus
-                        Row {
-                            IconButton(onClick = onEdit, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.Edit, contentDescription = "Editar", tint = ThemeSecondaryText, modifier = Modifier.size(16.dp))
+                        Box {
+                            IconButton(
+                                onClick = { showBookActions = true },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    contentDescription = "Mais opções para ${book.title}"
+                                )
                             }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.Delete, contentDescription = "Excluir", tint = Color.Red, modifier = Modifier.size(16.dp))
+                            DropdownMenu(
+                                expanded = showBookActions,
+                                onDismissRequest = { showBookActions = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Editar livro") },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                    onClick = { showBookActions = false; onEdit() }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Excluir livro") },
+                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                    onClick = { showBookActions = false; onDelete() }
+                                )
                             }
                         }
                     }
 
                     Text(
                         text = "Autor: ${book.author}",
-                        fontSize = 13.sp,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = ThemeSecondaryText,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -2181,7 +1919,7 @@ fun BookCard(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = shelfLocationText,
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                                 color = ThemePurplePrimary,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
@@ -2202,7 +1940,7 @@ fun BookCard(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = book.location.ifBlank { "Sem localização cadastrada" },
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 color = ThemeSecondaryText,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -2220,9 +1958,9 @@ fun BookCard(
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "${book.availableQuantity} de ${book.totalQuantity} disp.",
-                                fontSize = 12.sp,
-                                color = if (book.availableQuantity > 0) ThemePurplePrimary else Color.Red,
+                                text = "Disponíveis: ${book.availableQuantity} de ${book.totalQuantity}",
+                                fontSize = 14.sp,
+                                color = if (book.availableQuantity > 0) ThemePurplePrimary else StatusOverdueRedText,
                                 fontWeight = FontWeight.Bold
                             )
                             if (isOverdue) {
@@ -2238,12 +1976,12 @@ fun BookCard(
                                             imageVector = Icons.Default.Warning,
                                             contentDescription = "Possui cópias em atraso",
                                             tint = StatusOverdueRedText,
-                                            modifier = Modifier.size(10.dp)
+                                            modifier = Modifier.size(14.dp)
                                         )
                                         Spacer(modifier = Modifier.width(2.dp))
                                         Text(
                                             text = "Atrasado",
-                                            fontSize = 9.sp,
+                                            fontSize = 12.sp,
                                             color = StatusOverdueRedText,
                                             fontWeight = FontWeight.Bold
                                         )
@@ -2253,7 +1991,7 @@ fun BookCard(
                         }
                         Text(
                             text = "Ano: ${book.year}",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             color = ThemeSecondaryText
                         )
                     }
@@ -2263,11 +2001,11 @@ fun BookCard(
                         Button(
                             onClick = onLoan,
                             colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(28.dp)
+                            modifier = Modifier.heightIn(min = 48.dp)
                         ) {
-                            Text("Emprestar", fontSize = 11.sp)
+                            Text("Emprestar", fontSize = 14.sp)
                         }
                     } else {
                         Box(
@@ -2905,14 +2643,6 @@ fun LoansTab(viewModel: LibraryViewModel) {
                     color = ThemeSecondaryText,
                     modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
                 )
-            }
-        }
-
-        // 2. Statistics overview
-        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-            Column {
-                BentoStats(books = books, loans = loans)
-                Spacer(modifier = Modifier.height(4.dp))
             }
         }
 
@@ -4044,7 +3774,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Administre credenciais, execute exportações de redundância e recupere acervos locais.",
+                    text = "Ajustes simples e cópia de segurança do seu acervo.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = ThemeSecondaryText,
                     modifier = Modifier.padding(top = 2.dp)
@@ -4053,69 +3783,38 @@ fun SettingsTab(viewModel: LibraryViewModel) {
         }
 
         item {
-            val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
-            val userName by viewModel.userName.collectAsStateWithLifecycle()
-            val loginMethod by viewModel.loginMethod.collectAsStateWithLifecycle()
-
             Card(
-                colors = CardDefaults.cardColors(containerColor = ThemePurpleLight.copy(alpha = 0.3f)),
-                border = BorderStroke(1.dp, ThemePurpleLight),
-                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = LibrarySage),
+                border = BorderStroke(1.dp, ThemeBorder.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(ThemePurplePrimary),
+                        modifier = Modifier.size(44.dp).clip(CircleShape).background(LibrarySageStrong),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = userName?.take(2)?.uppercase() ?: "AD",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
-                        )
+                        Icon(Icons.Default.LocalLibrary, contentDescription = null, tint = LibraryForest)
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text("EducLib", fontWeight = FontWeight.Bold, color = ThemeOnBackground)
                         Text(
-                            text = userName ?: "Administrador Geral",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            color = ThemeOnBackground
-                        )
-                        Text(
-                            text = userEmail ?: "usuario@example.com",
-                            fontSize = 12.sp,
-                            color = ThemeSecondaryText
-                        )
-                        val methodBadge = when (loginMethod) {
-                            "google" -> "Autenticado via Google Smart Auth ✨"
-                            "email" -> "Autenticado via E-mail 📧"
-                            else -> "Administrador Local (Senha Mestre) 🔑"
-                        }
-                        Text(
-                            text = methodBadge,
-                            fontSize = 11.sp,
-                            color = ThemePurplePrimary,
-                            fontWeight = FontWeight.Bold,
+                            "Sem conta ou senha. Seus dados ficam neste aparelho.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ThemeSecondaryText,
                             modifier = Modifier.padding(top = 2.dp)
                         )
-                    }
-                    Button(
-                        onClick = { viewModel.logout() },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.1f)),
-                        border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.3f)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Logout, contentDescription = "Sair", tint = Color.Red, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Sair", color = Color.Red, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(
+                            "Criado por @nabikendo",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = LibraryForestDeep,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
                     }
                 }
             }

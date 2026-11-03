@@ -11,11 +11,20 @@ interface ShelfDao {
     @Query("SELECT * FROM shelves WHERE id = :id")
     suspend fun getShelfById(id: Int): ShelfEntity?
 
+    @Query("SELECT * FROM shelves ORDER BY name ASC")
+    suspend fun getAllShelvesSnapshot(): List<ShelfEntity>
+
     @Query("SELECT * FROM shelf_positions ORDER BY shelfId ASC, coordinate ASC")
     fun getAllPositionsFlow(): Flow<List<ShelfPositionEntity>>
 
     @Query("SELECT * FROM shelf_positions")
     suspend fun getAllPositions(): List<ShelfPositionEntity>
+
+    @Query("DELETE FROM shelf_positions")
+    suspend fun deleteAllPositions()
+
+    @Query("DELETE FROM shelves")
+    suspend fun deleteAllShelves()
 
     @Query("SELECT * FROM shelf_positions WHERE shelfId = :shelfId ORDER BY coordinate ASC")
     fun getPositionsForShelfFlow(shelfId: Int): Flow<List<ShelfPositionEntity>>

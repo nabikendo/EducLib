@@ -17,6 +17,15 @@ interface LoanDao {
     @Query("SELECT * FROM loans WHERE id = :id")
     suspend fun getLoanById(id: Int): LoanEntity?
 
+    @Query("SELECT * FROM loans WHERE returnDate IS NULL ORDER BY dueDate ASC")
+    suspend fun getActiveLoansSnapshot(): List<LoanEntity>
+
+    @Query("SELECT * FROM loans ORDER BY loanDate DESC")
+    suspend fun getAllLoansSnapshot(): List<LoanEntity>
+
+    @Query("DELETE FROM loans")
+    suspend fun deleteAllLoans()
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLoan(loan: LoanEntity): Long
 

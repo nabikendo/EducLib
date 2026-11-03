@@ -11,6 +11,12 @@ interface ReservationDao {
     @Query("SELECT * FROM reservations WHERE bookId = :bookId ORDER BY requestDate ASC")
     fun getReservationsForBook(bookId: Int): Flow<List<ReservationEntity>>
 
+    @Query("SELECT * FROM reservations ORDER BY requestDate ASC")
+    suspend fun getAllReservationsSnapshot(): List<ReservationEntity>
+
+    @Query("DELETE FROM reservations")
+    suspend fun deleteAllReservations()
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReservation(reservation: ReservationEntity): Long
 

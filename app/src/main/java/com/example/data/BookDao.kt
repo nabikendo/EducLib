@@ -11,6 +11,12 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE id = :id")
     suspend fun getBookById(id: Int): BookEntity?
 
+    @Query("SELECT * FROM books ORDER BY title ASC")
+    suspend fun getAllBooksSnapshot(): List<BookEntity>
+
+    @Query("DELETE FROM books")
+    suspend fun deleteAllBooks()
+
     @Query("SELECT * FROM books WHERE title LIKE :query OR author LIKE :query OR genre LIKE :query OR location LIKE :query ORDER BY title ASC")
     fun searchBooks(query: String): Flow<List<BookEntity>>
 

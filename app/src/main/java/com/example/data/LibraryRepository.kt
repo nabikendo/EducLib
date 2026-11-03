@@ -1,5 +1,6 @@
 package com.example.data
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import java.io.File
 
@@ -341,6 +342,52 @@ class LibraryRepository(private val database: AppDatabase) {
 
     suspend fun deletePosition(position: ShelfPositionEntity) {
         shelfDao.deletePosition(position)
+    }
+
+    suspend fun createBackupSnapshot(): BackupSnapshot = database.withTransaction {
+        BackupSnapshot(
+            books = bookDao.getAllBooksSnapshot(),
+            loans = loanDao.getAllLoansSnapshot(),
+            borrowers = borrowerDao.getAllBorrowersSnapshot(),
+            reservations = reservationDao.getAllReservationsSnapshot(),
+            shelves = shelfDao.getAllShelvesSnapshot(),
+            shelfPositions = shelfDao.getAllPositions(),
+            weeklySuggestions = weeklySuggestionDao.getAllSuggestionsSnapshot()
+        )
+    }
+
+    suspend fun restoreBackup(payload: BackupPayload) {
+        require(BackupManager.validate(payload) == null) { BackupManager.validate(payload) ?: "Backup inválido." }
+        val version = payload.formatVersion ?: 1
+        val books = payload.books.orEmpty().map { it.copy(photoPath = null) }
+        val loans = payload.loans.orEmpty()
+
+        database.withTransaction {
+            if (version >= BackupManager.CURRENT_FORMAT_VERSION) {
+                reservationDao.deleteAllReservations()
+                loanDao.deleteAllLoans()
+                weeklySuggestionDao.deleteAllSuggestions()
+                shelfDao.deleteAllPositions()
+                bookDao.deleteAllBooks()
+                borrowerDao.deleteAllBorrowers()
+                shelfDao.deleteAllShelves()
+
+                payload.shelves.orEmpty().forEach { shelfDao.insertShelf(it) }
+                payload.shelfPositions.orEmpty().forEach { shelfDao.insertPosition(it) }
+                payload.borrowers.orEmpty().forEach { borrowerDao.insertBorrower(it.copy(photoUri = null)) }
+                books.forEach { bookDao.insertBook(it) }
+                loans.forEach { loanDao.insertLoan(it) }
+                payload.reservations.orEmpty().forEach { reservationDao.insertReservation(it) }
+                payload.weeklySuggestions.orEmpty().forEach { weeklySuggestionDao.insertSuggestion(it) }
+            } else {
+                // Backups v1 só continham livros/empréstimos: preserva leitores,
+                // reservas, estantes, sugestões e configurações do aparelho atual.
+                loanDao.deleteAllLoans()
+                bookDao.deleteAllBooks()
+                books.forEach { bookDao.insertBook(it) }
+                loans.forEach { loanDao.insertLoan(it) }
+            }
+        }
     }
 
     // --- Weekly Suggestions Operations ---

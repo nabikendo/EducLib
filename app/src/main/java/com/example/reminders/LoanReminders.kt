@@ -143,7 +143,7 @@ class DueDateReminderWorker(
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "Resumo diário de empréstimos vencendo ou atrasados."
-                lockscreenVisibility = NotificationManager.VISIBILITY_PRIVATE
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PRIVATE
             }
             applicationContext.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }

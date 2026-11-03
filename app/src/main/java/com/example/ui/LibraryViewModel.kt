@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
+import com.example.widget.LoansWidgetProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -630,60 +631,42 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
     // --- Backup & Restore ---
     fun triggerAutoBackup(context: Context) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            BackupManager.saveAutoBackup(context, books.value, loans.value)
+            BackupManager.saveAutoBackup(context, repository.createBackupSnapshot())
+            LoansWidgetProvider.requestUpdate(context)
         }
     }
 
-    fun getShareBackupIntent(context: Context): Intent? {
-        return BackupManager.getShareIntent(context, books.value, loans.value)
+    fun previewBackup(jsonString: String): BackupPreview = BackupManager.preview(jsonString)
+
+    fun getShareBackupIntent(context: Context, onResult: (Intent?) -> Unit) {
+        viewModelScope.launch {
+            val intent = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                runCatching { BackupManager.getShareIntent(context, repository.createBackupSnapshot()) }.getOrNull()
+            }
+            onResult(intent)
+        }
     }
 
     fun getShareBooksCsvIntent(context: Context): Intent? {
         return BackupManager.getShareBooksCsvIntent(context, books.value)
     }
 
-    fun exportBackupToJson(): String {
-        return BackupManager.toJson(books.value, loans.value)
+    fun exportBackupToJson(onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            val json = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                runCatching { BackupManager.toJson(repository.createBackupSnapshot()) }.getOrNull()
+            }
+            onResult(json)
+        }
     }
 
     fun restoreBackup(context: Context, jsonString: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             val success = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 val payload = BackupManager.fromJson(jsonString) ?: return@withContext false
-                try {
-                    val db = AppDatabase.getDatabase(context)
-                    db.clearAllTables()
-
-                    payload.books?.forEach { book ->
-                        repository.insertBook(book)
-                    }
-
-                    payload.loans?.forEach { loan ->
-                        repository.createLoan(
-                            bookId = loan.bookId,
-                            borrowerName = loan.borrowerName,
-                            borrowerClass = loan.borrowerClass,
-                            loanDate = loan.loanDate
-                        ).let {
-                            if (loan.returnDate != null) {
-                                val allNewLoans = repository.allLoans.first()
-                                val inserted = allNewLoans.firstOrNull {
-                                    it.bookId == loan.bookId &&
-                                    it.borrowerName == loan.borrowerName &&
-                                    it.loanDate == loan.loanDate
-                                }
-                                if (inserted != null) {
-                                    repository.returnLoan(inserted.id, returnDate = loan.returnDate ?: System.currentTimeMillis())
-                                }
-                            }
-                        }
-                    }
-                    true
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    false
-                }
+                runCatching { repository.restoreBackup(payload) }.isSuccess
             }
+            if (success) triggerAutoBackup(context)
             onResult(success)
         }
     }

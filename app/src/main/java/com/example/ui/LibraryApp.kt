@@ -1613,11 +1613,25 @@ fun CatalogTab(
     val context = LocalContext.current
     var showDialogForLoanBook by remember { mutableStateOf<BookEntity?>(null) }
     var showBookDetailsDialog by remember { mutableStateOf<BookEntity?>(null) }
+    var selectedCatalogFilter by rememberSaveable { mutableStateOf("Todos") }
 
     val barcodeLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         if (result.contents != null) viewModel.searchBooks(result.contents)
     }
-    val orderedBooks = remember(books) { books.sortedBy { it.title.lowercase() } }
+    val activeLoanBookIds = remember(loans) { loans.filter { it.returnDate == null }.map { it.bookId }.toSet() }
+    val overdueBookIds = remember(loans) {
+        loans.filter { it.returnDate == null && it.calculatedIsOverdue() }.map { it.bookId }.toSet()
+    }
+    val orderedBooks = remember(books, selectedCatalogFilter, activeLoanBookIds, overdueBookIds) {
+        books.filter { book ->
+            when (selectedCatalogFilter) {
+                "Disponíveis" -> book.availableQuantity > 0
+                "Emprestados" -> book.id in activeLoanBookIds
+                "Atrasados" -> book.id in overdueBookIds
+                else -> true
+            }
+        }.sortedBy { it.title.lowercase() }
+    }
     val isTablet = context.resources.configuration.smallestScreenWidthDp >= 600
     val gridCells = if (isTablet) GridCells.Adaptive(minSize = 300.dp) else GridCells.Fixed(1)
 
@@ -1653,6 +1667,31 @@ fun CatalogTab(
             )
         }
 
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            Column(
+                modifier = Modifier.animateContentSize(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Todos", "Disponíveis", "Emprestados", "Atrasados").forEach { filter ->
+                        FilterChip(
+                            selected = selectedCatalogFilter == filter,
+                            onClick = { selectedCatalogFilter = filter },
+                            label = { Text(filter, style = MaterialTheme.typography.bodyMedium) }
+                        )
+                    }
+                }
+                Text(
+                    text = "${orderedBooks.size} ${if (orderedBooks.size == 1) "livro" else "livros"}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = ThemeSecondaryText
+                )
+            }
+        }
+
         if (orderedBooks.isEmpty()) {
             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
                 Card(
@@ -1676,18 +1715,26 @@ fun CatalogTab(
                             Icon(Icons.Default.MenuBook, contentDescription = null, tint = LibraryForest, modifier = Modifier.size(28.dp))
                         }
                         Text(
-                            text = if (searchQuery.isBlank()) "Seu acervo começa aqui" else "Não encontramos esse livro",
+                            text = when {
+                                searchQuery.isNotBlank() -> "Nenhum livro encontrado"
+                                selectedCatalogFilter != "Todos" -> "Nenhum livro neste filtro"
+                                else -> "Seu acervo começa aqui"
+                            },
                             style = MaterialTheme.typography.titleLarge,
                             color = ThemeOnBackground,
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = if (searchQuery.isBlank()) "Cadastre o primeiro livro para organizar sua biblioteca." else "Tente outro título ou autor, ou limpe a busca.",
+                            text = when {
+                                searchQuery.isNotBlank() -> "Tente outro título ou autor, limpe a busca ou escolha outro filtro."
+                                selectedCatalogFilter != "Todos" -> "Escolha outro filtro para ver mais livros do acervo."
+                                else -> "Cadastre o primeiro livro para organizar sua biblioteca."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = ThemeSecondaryText,
                             textAlign = TextAlign.Center
                         )
-                        if (searchQuery.isBlank()) {
+                        if (searchQuery.isBlank() && selectedCatalogFilter == "Todos") {
                             Button(
                                 onClick = onAddBookClick,
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
@@ -1699,18 +1746,21 @@ fun CatalogTab(
                             }
                         } else {
                             OutlinedButton(
-                                onClick = { viewModel.searchBooks("") },
+                                onClick = {
+                                    viewModel.searchBooks("")
+                                    selectedCatalogFilter = "Todos"
+                                },
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                                 shape = RoundedCornerShape(16.dp)
                             ) {
-                                Text("Limpar busca")
+                                Text(if (searchQuery.isNotBlank()) "Limpar busca e filtros" else "Mostrar todos os livros")
                             }
                         }
                     }
                 }
             }
         } else {
-            items(orderedBooks) { book ->
+            items(orderedBooks, key = { it.id }) { book ->
                 val shelfLocationText = remember(book.posicaoEstanteId, shelves, positions) {
                     if (book.posicaoEstanteId != null) {
                         val position = positions.find { it.id == book.posicaoEstanteId }
@@ -1746,15 +1796,16 @@ fun CatalogTab(
             book = book,
             viewModel = viewModel,
             onDismiss = { showDialogForLoanBook = null },
-            onConfirmLoan = { borrowerName, borrowerClass, loanQty ->
+            onConfirmLoan = { borrowerName, borrowerClass, loanQty, onResult ->
                 viewModel.loanBook(context, book.id, borrowerName, borrowerClass, loanQty) { success ->
                     if (success) {
-                        Toast.makeText(context, "Empréstimo registrado com sucesso!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Empréstimo registrado. Boa leitura!", Toast.LENGTH_SHORT).show()
+                        showDialogForLoanBook = null
                     } else {
                         Toast.makeText(context, "Não há exemplares suficientes disponíveis.", Toast.LENGTH_LONG).show()
                     }
+                    onResult(success)
                 }
-                showDialogForLoanBook = null
             }
         )
     }
@@ -1789,6 +1840,7 @@ fun BookCard(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 190.dp)
+            .animateContentSize()
             .clickable(onClickLabel = "Ver detalhes de ${book.title}") { onCardClick() }
             .testTag("book_card_${book.title}"),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -1912,14 +1964,14 @@ fun BookCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Layers,
-                                contentDescription = "Localização da Estante",
+                                contentDescription = null,
                                 tint = ThemePurplePrimary,
-                                modifier = Modifier.size(11.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = shelfLocationText,
-                                fontSize = 12.sp,
+                                fontSize = 14.sp,
                                 color = ThemePurplePrimary,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
@@ -1933,14 +1985,14 @@ fun BookCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Place,
-                                contentDescription = "Local",
+                                contentDescription = null,
                                 tint = ThemeSecondaryText,
-                                modifier = Modifier.size(12.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = book.location.ifBlank { "Sem localização cadastrada" },
-                                fontSize = 12.sp,
+                                fontSize = 14.sp,
                                 color = ThemeSecondaryText,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -1991,7 +2043,7 @@ fun BookCard(
                         }
                         Text(
                             text = "Ano: ${book.year}",
-                            fontSize = 12.sp,
+                            fontSize = 14.sp,
                             color = ThemeSecondaryText
                         )
                     }
@@ -2017,7 +2069,7 @@ fun BookCard(
                             Text(
                                text = "Esgotado",
                                 color = StatusOverdueRedText,
-                                fontSize = 11.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -2034,13 +2086,14 @@ fun LoanBookDialog(
     book: BookEntity,
     viewModel: LibraryViewModel,
     onDismiss: () -> Unit,
-    onConfirmLoan: (String, String, Int) -> Unit
+    onConfirmLoan: (String, String, Int, (Boolean) -> Unit) -> Unit
 ) {
     var borrowerName by remember { mutableStateOf("") }
     var borrowerClass by remember { mutableStateOf("") }
     var quantityToLoan by remember { mutableStateOf(1) }
     var errorText by remember { mutableStateOf("") }
     var showQuickRegisterDialog by remember { mutableStateOf(false) }
+    var isSubmittingLoan by remember { mutableStateOf(false) }
 
     val allBorrowersList by viewModel.allBorrowers.collectAsStateWithLifecycle()
     val allLoansList by viewModel.loans.collectAsStateWithLifecycle()
@@ -2053,7 +2106,9 @@ fun LoanBookDialog(
         } else {
             val qNorm = borrowerName.normalizeForSearch()
             allBorrowersList.filter {
-                it.name.normalizeForSearch().contains(qNorm)
+                it.name.normalizeForSearch().contains(qNorm) ||
+                    it.identifier.normalizeForSearch().contains(qNorm) ||
+                    it.classRoom.normalizeForSearch().contains(qNorm)
             }.take(5)
         }
     }
@@ -2334,10 +2389,10 @@ fun LoanBookDialog(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(48.dp)
                                     .clip(RoundedCornerShape(18.dp))
                                     .background(if (quantityToLoan > 1) ThemePurplePrimary else LibrarySurfaceAlt)
-                                    .clickable(enabled = quantityToLoan > 1) { quantityToLoan-- },
+                                    .clickable(enabled = quantityToLoan > 1, onClickLabel = "Diminuir exemplares") { quantityToLoan-- },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -2357,10 +2412,10 @@ fun LoanBookDialog(
                             
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(48.dp)
                                     .clip(RoundedCornerShape(18.dp))
                                     .background(if (quantityToLoan < book.availableQuantity) ThemePurplePrimary else ThemeBorder)
-                                    .clickable(enabled = quantityToLoan < book.availableQuantity) { quantityToLoan++ },
+                                    .clickable(enabled = quantityToLoan < book.availableQuantity, onClickLabel = "Aumentar exemplares") { quantityToLoan++ },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -2421,14 +2476,14 @@ fun LoanBookDialog(
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(36.dp)
+                                    .heightIn(min = 52.dp)
                                     .testTag("quick_register_borrower_button")
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Cadastrar", modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = if (borrowerName.isNotBlank()) "Cadastrar \"$borrowerName\"" else "Novo Perfil de Leitor",
-                                    fontSize = 11.sp
+                                    fontSize = 14.sp
                                 )
                             }
                         }
@@ -2491,7 +2546,7 @@ fun LoanBookDialog(
                                         )
                                         Text(
                                             text = "${borrower.type} • Turma: ${borrower.classRoom.ifBlank { "Nenhuma" }} • ${borrower.identifier}",
-                                            style = MaterialTheme.typography.labelSmall,
+                                            style = MaterialTheme.typography.bodyMedium,
                                             color = ThemeSecondaryText
                                         )
                                     }
@@ -2551,13 +2606,22 @@ fun LoanBookDialog(
                                     "Prof - ${matchedBorrower.classRoom.ifBlank { "Sem Turma" }}"
                                 }
                                 val finalQty = if (matchedBorrower.type == "Professor") quantityToLoan else 1
-                                onConfirmLoan(matchedBorrower.name, finalClass, finalQty)
+                                isSubmittingLoan = true
+                                onConfirmLoan(matchedBorrower.name, finalClass, finalQty) { success ->
+                                    if (!success) isSubmittingLoan = false
+                                }
                             }
                         },
+                        enabled = !isSubmittingLoan,
                         colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.heightIn(min = 52.dp)
                     ) {
-                        Text("Confirmar Empréstimo")
+                        if (isSubmittingLoan) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(if (isSubmittingLoan) "Registrando…" else "Confirmar empréstimo")
                     }
                 }
             }
@@ -3430,10 +3494,29 @@ fun SettingsTab(viewModel: LibraryViewModel) {
     val loans by viewModel.loans.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var returnRemindersEnabled by remember {
+        mutableStateOf(com.example.reminders.LoanReminderSettings.isEnabled(context))
+    }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            com.example.reminders.LoanReminderSettings.setEnabled(context, true)
+            returnRemindersEnabled = true
+            Toast.makeText(context, "Lembretes diários ativados.", Toast.LENGTH_SHORT).show()
+        } else {
+            returnRemindersEnabled = false
+            Toast.makeText(context, "Permissão não concedida. Os lembretes ficaram desativados.", Toast.LENGTH_LONG).show()
+        }
+    }
 
     var oldPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var changeStatusText by remember { mutableStateOf("") }
+
+    var pendingRestoreJson by remember { mutableStateOf<String?>(null) }
+    var pendingRestorePreview by remember { mutableStateOf<com.example.data.BackupPreview?>(null) }
+    var isRestoringBackup by remember { mutableStateOf(false) }
 
     var isUnlocked by rememberSaveable { mutableStateOf(false) }
     var passwordInput by remember { mutableStateOf("") }
@@ -3445,20 +3528,21 @@ fun SettingsTab(viewModel: LibraryViewModel) {
     ) { uri: Uri? ->
         if (uri != null) {
             try {
-                val inputAsString = context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    inputStream.bufferedReader().readText()
-                }
-                if (!inputAsString.isNullOrBlank()) {
-                    viewModel.restoreBackup(context, inputAsString) { success ->
-                        if (success) {
-                            Toast.makeText(context, "Backup restaurado com sucesso! Dados sincronizados.", Toast.LENGTH_LONG).show()
-                        } else {
-                            Toast.makeText(context, "Erro: Arquivo de backup inválido ou corrompido.", Toast.LENGTH_LONG).show()
-                        }
+                val inputAsString = com.example.data.BackupManager.readBackupText(context, uri)
+                if (inputAsString.isNullOrBlank()) {
+                    Toast.makeText(context, "O arquivo está vazio ou não pôde ser lido.", Toast.LENGTH_LONG).show()
+                } else {
+                    val preview = viewModel.previewBackup(inputAsString)
+                    if (preview.isValid) {
+                        pendingRestoreJson = inputAsString
+                        pendingRestorePreview = preview
+                    } else {
+                        Toast.makeText(context, preview.problem ?: "Este arquivo não é um backup compatível.", Toast.LENGTH_LONG).show()
                     }
                 }
+            } catch (e: IllegalArgumentException) {
+                Toast.makeText(context, e.message ?: "O arquivo é grande demais para importar.", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
-                e.printStackTrace()
                 Toast.makeText(context, "Erro ao abrir arquivo.", Toast.LENGTH_SHORT).show()
             }
         }
@@ -3468,15 +3552,16 @@ fun SettingsTab(viewModel: LibraryViewModel) {
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
         if (uri != null) {
-            try {
-                val jsonStr = viewModel.exportBackupToJson()
-                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    outputStream.write(jsonStr.toByteArray())
+            viewModel.exportBackupToJson { jsonStr ->
+                try {
+                    if (jsonStr.isNullOrBlank()) error("Não foi possível preparar os dados da biblioteca.")
+                    val output = context.contentResolver.openOutputStream(uri)
+                        ?: error("O local escolhido não permite salvar o arquivo.")
+                    output.use { it.write(jsonStr.toByteArray(Charsets.UTF_8)) }
+                    Toast.makeText(context, "Cópia de segurança salva.", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, e.message ?: "Erro ao salvar a cópia.", Toast.LENGTH_LONG).show()
                 }
-                Toast.makeText(context, "Backup salvo com sucesso!", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(context, "Erro ao salvar backup.", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -3820,6 +3905,37 @@ fun SettingsTab(viewModel: LibraryViewModel) {
             }
         }
 
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, ThemeBorder),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Acessibilidade e leitura", style = MaterialTheme.typography.titleMedium, color = ThemeOnBackground)
+                    Text(
+                        "O EducLib acompanha o tamanho de texto configurado no Android. Se estiver difícil de ler, amplie o texto nas configurações do celular.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ThemeSecondaryText
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                    ) {
+                        Text("Ajustar texto no celular")
+                    }
+                }
+            }
+        }
+
         // Card: SQLite integration info
         item {
             Card(
@@ -4140,7 +4256,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(44.dp)
+                            .heightIn(min = 52.dp)
                     ) {
                         Icon(Icons.Default.Upload, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
@@ -4150,7 +4266,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
             }
         }
 
-        // Card: Integrar com Plataformas Externas
+        // Lembretes locais de devolução, desligados até a pessoa optar por ativá-los.
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -4160,34 +4276,43 @@ fun SettingsTab(viewModel: LibraryViewModel) {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Integração Libib e Goodreads",
+                        text = "Lembretes de devolução",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                         color = ThemeOnBackground
                     )
                     Text(
-                        text = "Sincronização bidirecional com sua estante virtual do Goodreads e inventário Libib.",
+                        text = "Receba um resumo diário às 9h quando houver empréstimos vencendo hoje ou atrasados. Funciona no aparelho, sem conta ou internet; o Android pode atrasar avisos para economizar bateria.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = ThemeSecondaryText,
-                        modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                        modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(ThemeSecondaryText.copy(alpha = 0.1f))
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                    Button(
+                        onClick = {
+                            if (returnRemindersEnabled) {
+                                com.example.reminders.LoanReminderSettings.setEnabled(context, false)
+                                returnRemindersEnabled = false
+                                Toast.makeText(context, "Lembretes desativados.", Toast.LENGTH_SHORT).show()
+                            } else if (
+                                android.os.Build.VERSION.SDK_INT >= 33 &&
+                                androidx.core.content.ContextCompat.checkSelfPermission(
+                                    context,
+                                    android.Manifest.permission.POST_NOTIFICATIONS
+                                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                            ) {
+                                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                com.example.reminders.LoanReminderSettings.setEnabled(context, true)
+                                returnRemindersEnabled = true
+                                Toast.makeText(context, "Lembretes diários ativados.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Icon(Icons.Default.CloudSync, contentDescription = "Sincronizar", tint = ThemeSecondaryText, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Notifications, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Disponível na próxima atualização da API.",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = ThemeSecondaryText
-                        )
+                        Text(if (returnRemindersEnabled) "Desativar lembretes" else "Ativar lembretes")
                     }
                 }
             }
@@ -4203,13 +4328,13 @@ fun SettingsTab(viewModel: LibraryViewModel) {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Gerenciamento de Backup (.json)",
+                        text = "Cópia de segurança",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                         color = ThemeOnBackground
                     )
                     Text(
-                        text = "Crie uma cópia completa dos livros e histórico de empréstimos para arquivar no Drive ou compartilhar via WhatsApp.",
+                        text = "Salve seus dados para trocar de celular ou guarde uma cópia privada. Inclui registros do acervo, leitores, empréstimos, reservas e organização das estantes; não inclui fotos, senhas nem configurações.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = ThemeSecondaryText,
                         modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
@@ -4220,66 +4345,121 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Button(
-                            onClick = { saveBackupLauncher.launch("bibliotech_backup.json") },
+                            onClick = { saveBackupLauncher.launch("EducLib_backup_v2.json") },
                             colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(44.dp)
+                                .heightIn(min = 52.dp)
                                 .testTag("save_backup_button")
                         ) {
                             Icon(Icons.Default.SaveAlt, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Salvar no Dispositivo")
+                            Text("Salvar uma cópia")
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    val intent = viewModel.getShareBackupIntent(context)
+                        Button(
+                            onClick = {
+                                viewModel.getShareBackupIntent(context) { intent ->
                                     if (intent != null) {
-                                        context.startActivity(Intent.createChooser(intent, "Compartilhar Backup"))
+                                        context.startActivity(Intent.createChooser(intent, "Compartilhar cópia de segurança"))
                                     } else {
-                                        Toast.makeText(context, "Erro ao gerar arquivo de backup.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Não foi possível preparar a cópia.", Toast.LENGTH_SHORT).show()
                                     }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = ThemePurpleLight.copy(alpha=0.5f), contentColor = ThemePurplePrimary),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp)
-                                    .testTag("export_backup_button")
-                            ) {
-                                Icon(Icons.Default.Share, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Compartilhar")
-                            }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = ThemePurpleLight.copy(alpha = 0.5f), contentColor = ThemePurplePrimary),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 52.dp)
+                                .testTag("export_backup_button")
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Compartilhar backup")
+                        }
 
-                            Button(
-                                onClick = {
-                                    selectBackupFileLauncher.launch("application/json")
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = ThemeBackground),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp)
-                                    .testTag("restore_backup_button"),
-                                border = BorderStroke(1.dp, ThemeBorder)
-                            ) {
-                                Icon(Icons.Default.FileUpload, contentDescription = null, tint = ThemePurplePrimary)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Restaurar", color = ThemePurplePrimary)
-                            }
+                        OutlinedButton(
+                            onClick = { selectBackupFileLauncher.launch("application/json") },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 52.dp)
+                                .testTag("restore_backup_button"),
+                            border = BorderStroke(1.dp, ThemeBorder)
+                        ) {
+                            Icon(Icons.Default.FileUpload, contentDescription = null, tint = ThemePurplePrimary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Restaurar backup", color = ThemePurplePrimary)
                         }
                     }
                 }
             }
         }
     }
+
+        pendingRestorePreview?.let { preview ->
+            val createdAtText = preview.createdAt?.let {
+                java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it))
+            }
+            AlertDialog(
+                onDismissRequest = {
+                    if (!isRestoringBackup) {
+                        pendingRestorePreview = null
+                        pendingRestoreJson = null
+                    }
+                },
+                title = { Text("Confira antes de restaurar") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (createdAtText != null) Text("Cópia criada: $createdAtText")
+                        Text("Livros: ${preview.bookCount}  •  Empréstimos: ${preview.loanCount}")
+                        if (!preview.isLegacy) {
+                            Text("Leitores: ${preview.borrowerCount}  •  Reservas: ${preview.reservationCount}  •  Estantes: ${preview.shelfCount}")
+                            Text("Ao confirmar, os registros da biblioteca neste aparelho serão substituídos. Senhas e configurações ficam como estão.")
+                        } else {
+                            Text("Este backup antigo substitui apenas livros e empréstimos. Leitores, reservas, estantes e configurações atuais serão mantidos.")
+                        }
+                        Text("Fotos e capas não estão incluídas. O arquivo pode conter nomes, turmas e telefones de leitores; guarde-o com cuidado.")
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val json = pendingRestoreJson ?: return@Button
+                            isRestoringBackup = true
+                            viewModel.restoreBackup(context, json) { success ->
+                                isRestoringBackup = false
+                                pendingRestorePreview = null
+                                pendingRestoreJson = null
+                                Toast.makeText(
+                                    context,
+                                    if (success) "Cópia restaurada com segurança." else "Não foi possível restaurar. Seus dados anteriores foram mantidos.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        },
+                        enabled = !isRestoringBackup
+                    ) {
+                        if (isRestoringBackup) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(if (isRestoringBackup) "Restaurando…" else "Restaurar agora")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            pendingRestorePreview = null
+                            pendingRestoreJson = null
+                        },
+                        enabled = !isRestoringBackup
+                    ) { Text("Cancelar") }
+                }
+            )
+        }
 }
 }
 

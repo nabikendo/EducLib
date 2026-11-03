@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">EducLib</string>
+    <string name="loans_widget_description">Resumo privado de devoluções atrasadas, de hoje e dos próximos sete dias</string>
 </resources>

@@ -127,7 +127,6 @@ abstract class AppDatabase : RoomDatabase() {
                         "school_library_db"
                     )
                     .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
-                    .fallbackToDestructiveMigration(true)
                     .build()
 
                     try {
@@ -135,44 +134,9 @@ abstract class AppDatabase : RoomDatabase() {
                         INSTANCE = instance
                         instance
                     } catch (e: Throwable) {
-                        android.util.Log.e("AppDatabase", "Schema mismatch or migration error. Rebuilding database clean...", e)
-                        try {
-                            instance.close()
-                        } catch (ex: Exception) {
-                            // ignore
-                        }
-                        try {
-                            context.deleteDatabase("school_library_db")
-                        } catch (ex: Exception) {
-                            // ignore
-                        }
-                        try {
-                            val dbFile = context.getDatabasePath("school_library_db")
-                            if (dbFile.exists()) dbFile.delete()
-                            val walFile = java.io.File(dbFile.path + "-wal")
-                            if (walFile.exists()) walFile.delete()
-                            val shmFile = java.io.File(dbFile.path + "-shm")
-                            if (shmFile.exists()) shmFile.delete()
-                        } catch (ex: Exception) {
-                            // ignore
-                        }
-
-                        val cleanInstance = Room.databaseBuilder(
-                            context.applicationContext,
-                            AppDatabase::class.java,
-                            "school_library_db"
-                        )
-                        .fallbackToDestructiveMigration(true)
-                        .build()
-
-                        try {
-                            cleanInstance.openHelper.writableDatabase
-                        } catch (ex: Exception) {
-                            // ignore
-                        }
-
-                        INSTANCE = cleanInstance
-                        cleanInstance
+                        android.util.Log.e("AppDatabase", "Database initialization failed; existing data was not deleted.", e)
+                        runCatching { instance.close() }
+                        throw e
                     }
                 }
             }

@@ -39,6 +39,15 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Run focused unit tests
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew testDebugUnitTest --tests com.example.data.BackupManagerTest --tests com.example.reminders.LoanDueSummaryTest --stacktrace
+          else
+            gradle testDebugUnitTest --tests com.example.data.BackupManagerTest --tests com.example.reminders.LoanDueSummaryTest --stacktrace
+          fi
+
       - name: Build Debug APK
         run: |
           if [ -f "./gradlew" ]; then

@@ -1,6 +1,8 @@
 package com.example.ui
 
 import android.content.Context
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
@@ -27,6 +29,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 private const val UPDATE_PREFERENCES = "app_update_preferences"
@@ -140,6 +143,7 @@ private object AppUpdateChecker {
     }
 
 
+    @Suppress("DEPRECATION")
     suspend fun downloadApk(context: Context, release: AvailableRelease): Uri = withContext(Dispatchers.IO) {
         val parsed = Uri.parse(release.apkDownloadUrl)
         require(parsed.scheme == "https" && parsed.host == "github.com") {
@@ -169,9 +173,31 @@ private object AppUpdateChecker {
                 }
             }
             check(staging.length() > 0L) { "Arquivo APK vazio." }
-            val archive = context.packageManager.getPackageArchiveInfo(staging.absolutePath, 0)
-            check(archive?.packageName == context.packageName) {
+            val signingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                PackageManager.GET_SIGNING_CERTIFICATES
+            } else {
+                PackageManager.GET_SIGNATURES
+            }
+            val archive = context.packageManager.getPackageArchiveInfo(staging.absolutePath, signingFlags)
+                ?: error("Não foi possível ler o APK baixado.")
+            check(archive.packageName == context.packageName) {
                 "O APK não pertence ao EducLib."
+            }
+            check(archive.versionName == release.versionName) {
+                "A versão informada pela release não corresponde à versão do APK."
+            }
+            val archiveVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                archive.longVersionCode
+            } else {
+                archive.versionCode.toLong()
+            }
+            check(archiveVersionCode > BuildConfig.VERSION_CODE.toLong()) {
+                "O APK não é uma versão superior à instalada."
+            }
+            val installed = context.packageManager.getPackageInfo(context.packageName, signingFlags)
+            val archiveCertificates = certificateDigests(archive)
+            check(archiveCertificates.isNotEmpty() && archiveCertificates == certificateDigests(installed)) {
+                "O certificado do APK não corresponde ao aplicativo instalado."
             }
             check(staging.renameTo(destination)) { "Não foi possível finalizar o download." }
             FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", destination)
@@ -187,6 +213,19 @@ private object AppUpdateChecker {
             .remove(KEY_CACHED_APK_URL)
             .remove(KEY_CACHED_PAGE_URL)
             .apply()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun certificateDigests(packageInfo: PackageInfo): Set<String> {
+        val signatures = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.signingInfo?.apkContentsSigners
+        } else {
+            packageInfo.signatures
+        }).orEmpty()
+        return signatures.map { signature ->
+            MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
+                .joinToString("") { byte -> "%02x".format(byte) }
+        }.toSet()
     }
 
     private fun readCachedUpdate(preferences: SharedPreferences, currentVersion: String): AvailableRelease? {

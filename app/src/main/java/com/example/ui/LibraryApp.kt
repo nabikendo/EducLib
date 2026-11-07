@@ -8,6 +8,7 @@ import android.widget.Toast
 import android.app.Activity
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,6 +33,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -74,7 +76,9 @@ import com.example.data.ReservationEntity
 import com.example.data.ShelfEntity
 import com.example.data.ShelfPositionEntity
 import com.example.ui.theme.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -801,12 +805,19 @@ fun LoginScreen(onValidatePassword: suspend (String) -> Boolean) {
 
 @Composable
 fun MainLibraryAppContent(viewModel: LibraryViewModel) {
+    val books by viewModel.books.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(0) } // 0 = Catalog/Acervo, 1 = Circulation/Empréstimos, 2 = Borrowers, 3 = Configurations
     var isAddingBookRoute by rememberSaveable { mutableStateOf(false) }
-    var bookToEdit by remember { mutableStateOf<BookEntity?>(null) }
+    var bookToEditId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val bookToEdit = books.firstOrNull { it.id == bookToEditId }
 
     LaunchedEffect(selectedTab) {
         if (selectedTab !in 0..3) selectedTab = 0
+    }
+
+    BackHandler(enabled = isAddingBookRoute || bookToEditId != null) {
+        isAddingBookRoute = false
+        bookToEditId = null
     }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -815,7 +826,10 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
 
         if (isTablet) {
             val palette = com.example.ui.ipad.IpadPalette
-            Row(modifier = Modifier.fillMaxSize().background(palette.Canvas)) {
+            Row(
+                modifier = Modifier.fillMaxSize().background(palette.Canvas)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+            ) {
                 Surface(
                     modifier = Modifier.width(if (isWideTablet) 238.dp else 200.dp).fillMaxHeight(),
                     color = palette.Sidebar
@@ -844,20 +858,20 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         Text("MENU", modifier = Modifier.padding(start = 12.dp, bottom = 12.dp),
                             color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
                         val entries = listOf(
-                            Triple("Acervo", androidx.compose.material.icons.Icons.Outlined.MenuBook, 0),
+                            Triple("Acervo", androidx.compose.material.icons.Icons.AutoMirrored.Outlined.MenuBook, 0),
                             Triple("Empréstimos", androidx.compose.material.icons.Icons.Outlined.SwapHoriz, 1),
                             Triple("Leitores", androidx.compose.material.icons.Icons.Outlined.PeopleOutline, 2),
                             Triple("Configurações", androidx.compose.material.icons.Icons.Outlined.Settings, 3)
                         )
                         entries.forEach { (label, icon, tab) ->
-                            val selected = selectedTab == tab && !isAddingBookRoute && bookToEdit == null
+                            val selected = selectedTab == tab && !isAddingBookRoute && bookToEditId == null
                             NavigationDrawerItem(
                                 label = { Text(label) },
                                 selected = selected,
                                 onClick = {
                                     selectedTab = tab
                                     isAddingBookRoute = false
-                                    bookToEdit = null
+                                    bookToEditId = null
                                 },
                                 icon = { Icon(icon, contentDescription = null) },
                                 colors = NavigationDrawerItemDefaults.colors(
@@ -891,13 +905,14 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                     RenderScreen(
                         selectedTab = selectedTab,
                         isAdding = isAddingBookRoute,
+                        editingBookId = bookToEditId,
                         editingBook = bookToEdit,
                         viewModel = viewModel,
                         onAddBookRoute = { isAddingBookRoute = true },
-                        onEditBookRoute = { bookToEdit = it },
+                        onEditBookRoute = { bookToEditId = it.id },
                         onBack = {
                             isAddingBookRoute = false
-                            bookToEdit = null
+                            bookToEditId = null
                         }
                     )
                 }
@@ -906,7 +921,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
             // Mobile portrait layout: normal layout with bottom navigation bar
             Scaffold(
                 floatingActionButton = {
-                    if (selectedTab == 0 && !isAddingBookRoute && bookToEdit == null) {
+                    if (selectedTab == 0 && !isAddingBookRoute && bookToEditId == null) {
                         ExtendedFloatingActionButton(
                             onClick = { isAddingBookRoute = true },
                             containerColor = ThemePurplePrimary,
@@ -923,13 +938,13 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         tonalElevation = 8.dp
                     ) {
                         NavigationBarItem(
-                            selected = selectedTab == 0 && !isAddingBookRoute && bookToEdit == null,
+                            selected = selectedTab == 0 && !isAddingBookRoute && bookToEditId == null,
                             onClick = {
                                 selectedTab = 0
                                 isAddingBookRoute = false
-                                bookToEdit = null
+                                bookToEditId = null
                             },
-                            icon = { Icon(Icons.Outlined.MenuBook, contentDescription = "Acervo") },
+                            icon = { Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = "Acervo") },
                             label = { Text("Acervo") },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = ThemePurplePrimary,
@@ -941,11 +956,11 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         )
 
                         NavigationBarItem(
-                            selected = selectedTab == 1 && !isAddingBookRoute && bookToEdit == null,
+                            selected = selectedTab == 1 && !isAddingBookRoute && bookToEditId == null,
                             onClick = {
                                 selectedTab = 1
                                 isAddingBookRoute = false
-                                bookToEdit = null
+                                bookToEditId = null
                             },
                             icon = { Icon(Icons.Outlined.SwapHoriz, contentDescription = "Empréstimos") },
                             label = { Text("Empréstimos") },
@@ -959,11 +974,11 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         )
 
                         NavigationBarItem(
-                            selected = selectedTab == 2 && !isAddingBookRoute && bookToEdit == null,
+                            selected = selectedTab == 2 && !isAddingBookRoute && bookToEditId == null,
                             onClick = {
                                 selectedTab = 2
                                 isAddingBookRoute = false
-                                bookToEdit = null
+                                bookToEditId = null
                             },
                             icon = { Icon(Icons.Outlined.People, contentDescription = "Leitores") },
                             label = { Text("Leitores") },
@@ -977,11 +992,11 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         )
 
                         NavigationBarItem(
-                            selected = selectedTab == 3 && !isAddingBookRoute && bookToEdit == null,
+                            selected = selectedTab == 3 && !isAddingBookRoute && bookToEditId == null,
                             onClick = {
                                 selectedTab = 3
                                 isAddingBookRoute = false
-                                bookToEdit = null
+                                bookToEditId = null
                             },
                             icon = { Icon(Icons.Outlined.Settings, contentDescription = "Config") },
                             label = { Text("Config") },
@@ -1005,13 +1020,14 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                     RenderScreen(
                         selectedTab = selectedTab,
                         isAdding = isAddingBookRoute,
+                        editingBookId = bookToEditId,
                         editingBook = bookToEdit,
                         viewModel = viewModel,
                         onAddBookRoute = { isAddingBookRoute = true },
-                        onEditBookRoute = { bookToEdit = it },
+                        onEditBookRoute = { bookToEditId = it.id },
                         onBack = {
                             isAddingBookRoute = false
-                            bookToEdit = null
+                            bookToEditId = null
                         }
                     )
                 }
@@ -1020,19 +1036,27 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
     }
 }
 
+private data class AppScreenRoute(
+    val selectedTab: Int,
+    val isAdding: Boolean,
+    val editingBookId: Int?,
+    val editingBook: BookEntity?
+)
+
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun RenderScreen(
     selectedTab: Int,
     isAdding: Boolean,
+    editingBookId: Int?,
     editingBook: BookEntity?,
     viewModel: LibraryViewModel,
     onAddBookRoute: () -> Unit,
     onEditBookRoute: (BookEntity) -> Unit,
     onBack: () -> Unit
 ) {
-    val route = remember(selectedTab, isAdding, editingBook) {
-        Triple(selectedTab, isAdding, editingBook)
+    val route = remember(selectedTab, isAdding, editingBookId, editingBook) {
+        AppScreenRoute(selectedTab, isAdding, editingBookId, editingBook)
     }
 
     AnimatedContent(
@@ -1045,22 +1069,21 @@ fun RenderScreen(
     ) { targetRoute ->
         Box(modifier = Modifier.fillMaxSize()) {
             when {
-                targetRoute.second -> {
-                    AddEditBookScreen(
-                        bookToEdit = null,
-                        viewModel = viewModel,
-                        onBack = onBack
-                    )
+                targetRoute.isAdding -> {
+                    AddEditBookScreen(bookToEdit = null, viewModel = viewModel, onBack = onBack)
                 }
-                targetRoute.third != null -> {
-                    AddEditBookScreen(
-                        bookToEdit = targetRoute.third,
-                        viewModel = viewModel,
-                        onBack = onBack
-                    )
+                targetRoute.editingBookId != null -> {
+                    val book = targetRoute.editingBook
+                    if (book != null) {
+                        AddEditBookScreen(bookToEdit = book, viewModel = viewModel, onBack = onBack)
+                    } else {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
                 }
                 else -> {
-                    when (targetRoute.first) {
+                    when (targetRoute.selectedTab) {
                         0 -> CatalogTab(viewModel, onAddBookRoute, onEditBookRoute)
                         1 -> LoansTab(viewModel)
                         2 -> BorrowersTab(viewModel)
@@ -1189,8 +1212,9 @@ fun BentoStats(
     val totalCopies = books.sumOf { it.totalQuantity }
     val availableCopies = books.sumOf { it.availableQuantity }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-        val isWide = LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+        val isWide = maxWidth >= 600.dp
+        Column(modifier = Modifier.fillMaxWidth()) {
         
         if (isWide) {
             Row(
@@ -1386,7 +1410,7 @@ fun BentoStats(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.TrendingUp,
+                    imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
                     contentDescription = null,
                     tint = ThemePurplePrimary,
                     modifier = Modifier.size(16.dp)
@@ -1401,6 +1425,7 @@ fun BentoStats(
                 )
             }
         }
+    }
     }
 }
 
@@ -1460,7 +1485,7 @@ fun LibrarianPocketGuide() {
                         desc = "Vá na aba 'Empréstimos', encontre o empréstimo na lista e clique em 'Devolver' ou 'Renovar (+7 dias)'. Se houver atraso, o app mostrará um alerta vermelho."
                     )
                     GuideItem(
-                        icon = Icons.Outlined.Send,
+                        icon = Icons.AutoMirrored.Outlined.Send,
                         title = "Como Notificar Leitor sobre Atraso via WhatsApp?",
                         desc = "Nos empréstimos atrasados, toque no botão verde 'Alertar WhatsApp'. Você poderá revisar e editar o texto pré-criado e abrir o WhatsApp para enviar em 1 clique."
                     )
@@ -1543,13 +1568,13 @@ fun CatalogTab(
             }
         }.sortedBy { it.title.lowercase() }
     }
-    val isTablet = context.resources.configuration.smallestScreenWidthDp >= 600
-    val gridCells = if (isTablet) GridCells.Adaptive(minSize = 300.dp) else GridCells.Fixed(1)
     var selectedDetailBookId by rememberSaveable { mutableStateOf<Int?>(null) }
     val selectedDetailBook = books.firstOrNull { it.id == selectedDetailBookId }
 
     SharedTransitionLayout {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    val isTablet = maxWidth >= 600.dp
+    val gridCells = if (isTablet) GridCells.Adaptive(minSize = 300.dp) else GridCells.Fixed(1)
     val splitView = isTablet && maxWidth >= 850.dp
     Row(modifier = Modifier.fillMaxSize()) {
     LazyVerticalGrid(
@@ -1630,7 +1655,7 @@ fun CatalogTab(
                                 .background(LibrarySage),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Outlined.MenuBook, contentDescription = null, tint = LibraryForest, modifier = Modifier.size(28.dp))
+                            Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = null, tint = LibraryForest, modifier = Modifier.size(28.dp))
                         }
                         Text(
                             text = when {
@@ -1717,7 +1742,7 @@ fun CatalogTab(
     androidx.compose.animation.AnimatedVisibility(
         visible = splitView && selectedDetailBook != null,
         enter = androidx.compose.animation.slideInHorizontally(
-            animationSpec = androidx.compose.animation.core.tween(320),
+            animationSpec = androidx.compose.animation.core.tween(com.example.ui.ipad.IpadMotion.PanelMillis),
             initialOffsetX = { it / 3 }
         ) + androidx.compose.animation.fadeIn(),
         exit = androidx.compose.animation.slideOutHorizontally(
@@ -1750,7 +1775,7 @@ fun CatalogTab(
                             Modifier.fillMaxWidth().height(210.dp).sharedElement(
                                 rememberSharedContentState(key = "book_cover_${book.id}"),
                                 this@AnimatedVisibility,
-                                boundsTransform = { _, _ -> androidx.compose.animation.core.tween(320) }
+                                boundsTransform = { _, _ -> androidx.compose.animation.core.tween(com.example.ui.ipad.IpadMotion.PanelMillis) }
                             )
                         }
                     ) {
@@ -1767,7 +1792,7 @@ fun CatalogTab(
                                     modifier = Modifier.fillMaxSize()
                                 )
                             } else {
-                                Icon(Icons.Outlined.MenuBook, contentDescription = null,
+                                Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = null,
                                     tint = com.example.ui.ipad.IpadPalette.Ink,
                                     modifier = Modifier.size(84.dp))
                             }
@@ -1870,7 +1895,7 @@ fun BookCard(
                 Modifier.fillMaxSize().sharedElement(
                     rememberSharedContentState(key = "book_cover_${book.id}"),
                     this@AnimatedVisibility,
-                    boundsTransform = { _, _ -> androidx.compose.animation.core.tween(320) }
+                    boundsTransform = { _, _ -> androidx.compose.animation.core.tween(com.example.ui.ipad.IpadMotion.PanelMillis) }
                 )
             } else Modifier.fillMaxSize()
             Box(modifier = coverModifier.background(ThemeBackground), contentAlignment = Alignment.Center) {
@@ -2662,6 +2687,9 @@ fun LoanBookDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoansTab(viewModel: LibraryViewModel) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    val isTablet = maxWidth >= 600.dp
+    val gridCells = if (isTablet) GridCells.Adaptive(minSize = 340.dp) else GridCells.Fixed(1)
     val loans by viewModel.loans.collectAsStateWithLifecycle()
     val books by viewModel.books.collectAsStateWithLifecycle()
     val reservations by viewModel.reservations.collectAsStateWithLifecycle()
@@ -2691,12 +2719,6 @@ fun LoansTab(viewModel: LibraryViewModel) {
         }
     }
 
-    val gridCells = if (LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600) {
-        GridCells.Adaptive(minSize = 340.dp)
-    } else {
-        GridCells.Fixed(1)
-    }
-
     LazyVerticalGrid(
         columns = gridCells,
         contentPadding = PaddingValues(bottom = 96.dp),
@@ -2708,7 +2730,6 @@ fun LoansTab(viewModel: LibraryViewModel) {
     ) {
         // 1. Header label
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-            val isTablet = LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600
             val titleStyle = if (isTablet) {
                 MaterialTheme.typography.headlineLarge
             } else {
@@ -3012,6 +3033,7 @@ fun LoansTab(viewModel: LibraryViewModel) {
             }
         )
     }
+    }
 }
 
 @Composable
@@ -3227,7 +3249,7 @@ fun LoanCard(
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.Send,
+                                imageVector = Icons.AutoMirrored.Outlined.Send,
                                 contentDescription = "WhatsApp",
                                 tint = StatusAvailableGreenText,
                                 modifier = Modifier.size(16.dp)
@@ -3338,7 +3360,7 @@ fun LoanCard(
                                 modifier = Modifier.height(28.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Send,
+                                    imageVector = Icons.AutoMirrored.Outlined.Send,
                                     contentDescription = null,
                                     tint = Color.White,
                                     modifier = Modifier.size(12.dp)
@@ -3397,7 +3419,7 @@ fun OverdueWhatsAppDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Send,
+                    imageVector = Icons.AutoMirrored.Outlined.Send,
                     contentDescription = null,
                     tint = StatusAvailableGreenText,
                     modifier = Modifier.size(24.dp)
@@ -3510,6 +3532,8 @@ private fun Context.findActivity(): Activity? {
 // --- TAB 3: SETTINGS & BACKUPS ---
 @Composable
 fun SettingsTab(viewModel: LibraryViewModel) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    val isTablet = maxWidth >= 600.dp
     val books by viewModel.books.collectAsStateWithLifecycle()
     val loans by viewModel.loans.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -3546,8 +3570,10 @@ fun SettingsTab(viewModel: LibraryViewModel) {
     val exportPortableLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
-        if (uri != null) viewModel.exportPortableBackup(context, uri) { success ->
-            Toast.makeText(context, if (success) "Backup com fotos salvo." else "Falha ao exportar backup com fotos.", Toast.LENGTH_LONG).show()
+        if (uri != null) viewModel.exportPortableBackup(context, uri) { success, problem ->
+            val message = if (success) "Backup com fotos salvo. Guarde o arquivo em local privado: ele contém dados e imagens de leitores."
+            else "Falha ao exportar backup com fotos. ${problem.orEmpty()}"
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
     val importPortableLauncher = rememberLauncherForActivityResult(
@@ -3877,7 +3903,6 @@ fun SettingsTab(viewModel: LibraryViewModel) {
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item {
-            val isTablet = LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600
             val titleStyle = if (isTablet) {
                 MaterialTheme.typography.headlineLarge
             } else {
@@ -4454,16 +4479,18 @@ fun SettingsTab(viewModel: LibraryViewModel) {
             AlertDialog(
                 onDismissRequest = { if (!isRestoringBackup) pendingPortableBackup = null },
                 title = { Text("Restaurar backup completo?") },
-                text = { Text("Os cadastros atuais serão substituídos pelos dados do arquivo ZIP, incluindo as fotografias locais disponíveis. Confirme somente se deseja substituir a biblioteca atual.") },
+                text = { Text("O ZIP contém registros de livros/leitores, possíveis nomes, turmas, telefones e fotografias locais; não é criptografado e deve ser mantido em local privado. Ao confirmar, os cadastros atuais serão substituídos pelos dados deste arquivo.") },
                 confirmButton = {
                     Button(
                         enabled = !isRestoringBackup,
                         onClick = {
                             isRestoringBackup = true
-                            viewModel.restorePortableBackup(context, uri) { success ->
+                            viewModel.restorePortableBackup(context, uri) { success, problem ->
                                 isRestoringBackup = false
                                 pendingPortableBackup = null
-                                Toast.makeText(context, if (success) "Backup com fotos restaurado." else "Falha na restauração; confira o arquivo.", Toast.LENGTH_LONG).show()
+                                val message = if (success) "Backup com fotos restaurado."
+                                else "Falha na restauração; confira o arquivo. ${problem.orEmpty()}"
+                                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                             }
                         }
                     ) { Text(if (isRestoringBackup) "Restaurando..." else "Confirmar restauração") }
@@ -4536,12 +4563,14 @@ fun SettingsTab(viewModel: LibraryViewModel) {
             )
         }
 }
+    }
 }
 
 
 // --- SCREEN: ADD & EDIT BOOK ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+
 fun AddEditBookScreen(
     bookToEdit: BookEntity?,
     viewModel: LibraryViewModel,
@@ -4550,15 +4579,15 @@ fun AddEditBookScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var title by remember { mutableStateOf(bookToEdit?.title ?: "") }
-    var author by remember { mutableStateOf(bookToEdit?.author ?: "") }
-    var year by remember { mutableStateOf(bookToEdit?.year?.toString() ?: "") }
-    var location by remember { mutableStateOf(bookToEdit?.location ?: "") }
-    var totalQuantity by remember { mutableStateOf(bookToEdit?.totalQuantity?.toString() ?: "1") }
-    var selectedGenre by remember { mutableStateOf(bookToEdit?.genre ?: "Literatura Clássica") }
-    var photoPathByUri by remember { mutableStateOf<String?>(bookToEdit?.photoPath) }
+    var title by rememberSaveable(bookToEdit?.id) { mutableStateOf(bookToEdit?.title ?: "") }
+    var author by rememberSaveable(bookToEdit?.id) { mutableStateOf(bookToEdit?.author ?: "") }
+    var year by rememberSaveable(bookToEdit?.id) { mutableStateOf(bookToEdit?.year?.toString() ?: "") }
+    var location by rememberSaveable(bookToEdit?.id) { mutableStateOf(bookToEdit?.location ?: "") }
+    var totalQuantity by rememberSaveable(bookToEdit?.id) { mutableStateOf(bookToEdit?.totalQuantity?.toString() ?: "1") }
+    var selectedGenre by rememberSaveable(bookToEdit?.id) { mutableStateOf(bookToEdit?.genre ?: "Literatura Clássica") }
+    var photoPathByUri by rememberSaveable(bookToEdit?.id) { mutableStateOf<String?>(bookToEdit?.photoPath) }
     
-    var isbnToSearch by remember { mutableStateOf(bookToEdit?.isbn ?: "") }
+    var isbnToSearch by rememberSaveable(bookToEdit?.id) { mutableStateOf(bookToEdit?.isbn ?: "") }
     var isSearchingIsbn by remember { mutableStateOf(false) }
     var isSearchingCovers by remember { mutableStateOf(false) }
     var foundCoversList by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
@@ -5477,6 +5506,9 @@ object AlertDialogHelper {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BorrowersTab(viewModel: LibraryViewModel) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    val isTablet = maxWidth >= 600.dp
+    val gridCells = if (isTablet) GridCells.Adaptive(minSize = 260.dp) else GridCells.Fixed(1)
     val context = LocalContext.current
     val borrowers by viewModel.borrowers.collectAsStateWithLifecycle()
     val loans by viewModel.loans.collectAsStateWithLifecycle()
@@ -5487,12 +5519,6 @@ fun BorrowersTab(viewModel: LibraryViewModel) {
     var selectedBorrowerForDetails by remember { mutableStateOf<BorrowerEntity?>(null) }
     
     var filterType by rememberSaveable { mutableStateOf("Todos") } // "Todos", "Aluno", "Professor"
-
-    val gridCells = if (LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600) {
-        GridCells.Adaptive(minSize = 260.dp)
-    } else {
-        GridCells.Fixed(1)
-    }
 
     val filteredList = remember(borrowers, filterType) {
         borrowers.filter {
@@ -5516,7 +5542,6 @@ fun BorrowersTab(viewModel: LibraryViewModel) {
     ) {
         // 1. Header label & actions
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-            val isTablet = LocalContext.current.resources.configuration.smallestScreenWidthDp >= 600
             if (isTablet) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -5761,6 +5786,7 @@ fun BorrowersTab(viewModel: LibraryViewModel) {
             }
         )
     }
+    }
 }
 
 @Composable
@@ -5893,14 +5919,27 @@ fun BorrowerAvatar(
                     modifier = Modifier.fillMaxSize(0.55f)
                 )
             }
-        } else if (!photoUri.isNullOrEmpty() && (photoUri.startsWith("content://") || photoUri.startsWith("file://") || photoUri.startsWith("http"))) {
-            AsyncImage(
-                model = photoUri,
-                contentDescription = "Foto do Leitor",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                error = androidx.compose.ui.graphics.vector.rememberVectorPainter(Icons.Outlined.Person)
-            )
+        } else if (!photoUri.isNullOrEmpty() && !photoUri.startsWith("avatar:")) {
+            val photoModel: Any? = when {
+                photoUri.startsWith("content://") || photoUri.startsWith("file://") || photoUri.startsWith("http") -> photoUri
+                else -> File(photoUri).takeIf { it.isFile }
+            }
+            if (photoModel != null) {
+                AsyncImage(
+                    model = photoModel,
+                    contentDescription = "Foto do Leitor",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    error = androidx.compose.ui.graphics.vector.rememberVectorPainter(Icons.Outlined.Person)
+                )
+            } else {
+                Text(
+                    text = initials,
+                    fontSize = (size.value * 0.33).sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ThemePurplePrimary
+                )
+            }
         } else {
             // Initials Fallback
             Text(
@@ -5921,6 +5960,7 @@ fun AddEditBorrowerDialog(
     prefilledName: String = ""
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var name by remember { mutableStateOf(borrowerToEdit?.name ?: prefilledName) }
     var type by remember { mutableStateOf(borrowerToEdit?.type ?: "Aluno") } // "Aluno" or "Professor"
     var classRoom by remember { mutableStateOf(borrowerToEdit?.classRoom ?: "") }
@@ -5933,7 +5973,21 @@ fun AddEditBorrowerDialog(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            photoUri = uri.toString()
+            scope.launch {
+                val savedPath = withContext(Dispatchers.IO) {
+                    ImageStorageHelper.saveImageToInternalStorage(
+                        context,
+                        uri,
+                        directoryName = "reader_photos",
+                        filePrefix = "reader"
+                    )
+                }
+                if (savedPath != null) {
+                    photoUri = savedPath
+                } else {
+                    Toast.makeText(context, "Não foi possível guardar a foto do leitor.", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
@@ -6427,7 +6481,7 @@ fun BorrowerDetailsDialog(
                                 colors = ButtonDefaults.buttonColors(containerColor = StatusAvailableGreenBg)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Send,
+                                    imageVector = Icons.AutoMirrored.Outlined.Send,
                                     contentDescription = "WhatsApp",
                                     tint = StatusAvailableGreenText,
                                     modifier = Modifier.size(16.dp)
@@ -7347,7 +7401,7 @@ fun LibraryInsightsDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.TrendingUp,
+                                imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
                                 contentDescription = null,
                                 tint = ThemePurplePrimary,
                                 modifier = Modifier.size(20.dp)
@@ -8367,7 +8421,7 @@ fun ReservationCard(
                             ) {
                                 Box(modifier = Modifier.clip(RoundedCornerShape(18.dp)).background(StatusAvailableGreenBg).size(36.dp), contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Outlined.Send,
+                                        imageVector = Icons.AutoMirrored.Outlined.Send,
                                         contentDescription = "Notificar por WhatsApp",
                                         tint = StatusAvailableGreenText,
                                         modifier = Modifier.size(18.dp)
@@ -9578,7 +9632,7 @@ fun JtaModuleView(viewModel: LibraryViewModel, books: List<BookEntity>) {
                 Spacer(modifier = Modifier.height(10.dp))
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.MenuBook, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(18.dp))
+                    Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(text = "Total Acervo: ${books.size} un.", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
@@ -9740,7 +9794,7 @@ fun JtaModuleView(viewModel: LibraryViewModel, books: List<BookEntity>) {
                             border = BorderStroke(1.dp, StatusAvailableGreenText),
                             contentPadding = PaddingValues(vertical = 4.dp)
                         ) {
-                            Icon(Icons.Outlined.Comment, contentDescription = null, modifier = Modifier.size(12.dp))
+                            Icon(Icons.AutoMirrored.Outlined.Comment, contentDescription = null, modifier = Modifier.size(12.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Anotar Motivação", fontSize = 10.sp, color = StatusAvailableGreenText)
                         }

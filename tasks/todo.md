@@ -1,49 +1,43 @@
-# EducLib — iPad-inspired tablet UI
+# EducLib 16.5.0 — auditoria, correções e release
 
-- [x] Design tablet landscape mockups in Figma.
-- [x] Add editorial pastel palette and motion tokens.
-- [x] Adapt library welcome header for wide tablets without breaking phone layout.
-- [x] Replace tablet sidebar placeholder icons with consistent outlined Material vector icons.
-- [ ] Audit and unify iconography across the remaining screens.
-- [x] Implement responsive dark sidebar for tablets (>= 600 dp width).
-- [x] Implement animated master/detail split view for wide landscape tablets; full history remains available in existing dialog.
-- [ ] Add true shared-element transitions between book covers and details (panel slide/fade implemented).
-- [x] Add CI triggers for feature branch and pull requests.
-- [x] Android CI build and focused unit tests succeeded at commit 4bdd28b3.
-- [ ] Re-run CI for the latest iconography commit and capture tablet screenshots.
-- [ ] Review dark mode, accessibility, reduced motion and keyboard navigation.
+## Estado remoto confirmado
 
-Implementation is isolated on branch `design/ipados-tablet-editorial`; not yet merged.
+- PR #4 está integrado à `main` pelo commit `56a3f7b04862e7c93765c9a1d13a9152128b4161`.
+- `main` está no commit `66c283a028ad861f1c786f10f426d16cce330aff`, com `versionName = "16.5.0"` e `versionCode = 21`.
+- O run `42322171208` terminou com sucesso para o commit de versão; ele ocorreu antes das correções desta auditoria, então não aprova este diff.
+- A release de referência `v16.4.0` está publicada com `EducLib-16.4.0.apk` (15.017.813 bytes). Nenhuma publicação 16.5.0 está confirmada neste checklist.
+- Room permanece na versão 9, igual à 16.4.0; as correções não alteram esquema nem exigem migração. Não usar fallback destrutivo.
 
-## Audit findings
+## Correções preparadas na branch de auditoria
 
-- [x] Loan creation, return and deletion previously used multiple DB writes without an enclosing transaction; wrapped in Room transactions.
-- [x] Loan creation previously accepted quantity <= 0; rejected.
-- [ ] Check restore of backup images: portable backup explicitly drops book and borrower photo paths.
-- [ ] Check dialog overflow and screen-reader navigation on landscape tablets.
-- [ ] Confirm Android 36.1 SDK availability in CI environment.
+- [x] Tornar breakpoints das telas principais dependentes da largura Compose disponível; manter navegação tablet e safe insets; centralizar o token da transição de capas em 320 ms.
+- [x] Converter os ícones residuais para Material Outlined; a seta de voltar permanece `AutoMirrored.Filled` porque o artefato Compose instalado não fornece a variante Outlined autoespelhada.
+- [x] Persistir fotos selecionadas de leitores no armazenamento privado; limpar arquivos parciais se a cópia falhar; preservar avatares predefinidos no backup JSON/ZIP.
+- [x] ZIP inclui índice de mídia; exportação e importação aplicam limites simétricos e falham quando fotos locais cadastradas faltam ou estão inacessíveis; restauração limpa cópias de mídia se a transação Room falhar.
+- [x] Adicionar testes Robolectric para round-trip ZIP de capa/retrato, bytes, avatar, índice incompleto, foto ausente e restauração em Room em memória; adicionar testes para IDs inválidos e preservação de sugestões históricas. O primeiro CI revelou que Robolectric 4.16.1 não suporta API 36; o teste foi fixado em API 35 e aguarda novo CI.
+- [x] Fortalecer validação de IDs do backup e impedir que fallback de cópia parcial sobrescreva o último backup automático JSON válido.
+- [x] Atualizador valida pacote, versão/código crescente e SHA-256 do certificado contra o app instalado antes de encaminhar o APK ao instalador.
+- [x] Workflow de release exige commit contido em `main`, executa testes, confere metadados do APK e continuidade do certificado em relação à release estável anterior.
+- [x] README e este checklist atualizados; correções aprendidas registradas em `tasks/lessons.md`.
 
-## Update distribution
+## Gates obrigatórios antes de anunciar publicação
 
-- [x] In-app APK download from stable GitHub Release, Android installer handoff and next-day retry.
-- [x] Validate APK package name before opening installer.
-- [ ] Verify installer flow on physical tablet, APK signing continuity and stable release secrets.
+- [x] PR #5 da branch `audit/16.5.0` aberto; revisar diff final e integrar somente depois de todos os checks aprovados.
+- [ ] CI da branch/PR precisa compilar e passar os testes focados, inclusive `PortableMediaBackupTest`. O sandbox não tem Gradle nem Android SDK configurados; `git diff --check` e `bash -n` nos blocos dos workflows não substituem a compilação.
+- [ ] Só após merge e CI verde, criar/enviar a tag `v16.5.0`.
+- [ ] Acompanhar o workflow de release e confirmar em GitHub Releases o APK `EducLib-16.5.0.apk`, `versionName=16.5.0`, `versionCode=21`, assinatura APK válida e certificado SHA-256 idêntico ao APK 16.4.0.
+- [ ] Teste de instalação sobre 16.4.0 com dados representativos e teste visual/funcional em tablet Android real ou emulador ainda não foram executados; a responsividade/transição foram revisadas estaticamente.
 
-## Release status
+## Bloqueios e proteção de dados
 
-- Stable release is **not** published. Main is unchanged.
-- Publishing requires a passing build for the final commit, signing continuity, and verification of the update installer on a real Android tablet.
+- As credenciais e a verificação criptográfica da keystore são reservadas ao workflow de release; não ler nem copiar segredos para o ambiente local.
+- Se o CI falhar, corrigir e repetir CI antes do tag. Se o workflow de release falhar na comparação do certificado, confirmar que `ANDROID_KEYSTORE_BASE64` corresponde à chave da release 16.4.0; não substituir a assinatura nem desinstalar o app como workaround.
+- O ZIP contém registros e fotografias pessoais e não é criptografado; manter a confirmação de restauração e orientar armazenamento privado.
+- Sugestões semanais são denormalizadas e não têm foreign key/cascade para livros; sua referência pode continuar após a exclusão do livro. Não apagá-las automaticamente nem rejeitar esse histórico durante o backup.
 
-## Escopo de 06/11 — capas, ícones e backups
+## Fontes remotas verificadas
 
-- [x] Adicionar transição compartilhada da capa no Split View com SharedTransitionLayout, duração de 320 ms.
-- [x] Animar a capa no Figma (frame 22:78) com translação e escala de 320 ms.
-- [x] Converter os ícones das telas principais, diálogos e configurações para Material Outlined.
-- [x] Criar backup portátil ZIP com manifesto JSON v2 e fotos locais de livros/leitores.
-- [x] Criar exportação e restauração ZIP com confirmação explícita antes da substituição dos dados.
-- [x] Limitar tamanho de entradas e validar caminhos/IDs para reduzir riscos de ZIP malformado.
-- [ ] Confirmar compilação e testes do commit final no GitHub Actions.
-- [ ] Testar animação de capa, restauração e exportação em tablet físico.
-- [ ] Criar testes automatizados de ida e volta do ZIP e interrupções de restauração.
-
-Observações: o backup automático e a exportação JSON continuam sem imagens para manter compatibilidade; a opção ZIP é o backup multimídia completo. Fotos remotas por URL não são incorporadas ao ZIP. O arquivo de restauração substitui os cadastros atuais após confirmação. A versão estável permanece não publicada.
+- [Repositório EducLib](https://github.com/nabikendo/EducLib)
+- [PR #4 integrado](https://github.com/nabikendo/EducLib/pull/4)
+- [GitHub Actions — run 42322171208](https://github.com/nabikendo/EducLib/actions/runs/42322171208)
+- [Release publicada 16.4.0 e APK de referência](https://github.com/nabikendo/EducLib/releases/tag/v16.4.0)

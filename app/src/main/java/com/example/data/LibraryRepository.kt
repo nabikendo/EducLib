@@ -375,7 +375,14 @@ class LibraryRepository(private val database: AppDatabase) {
 
                 payload.shelves.orEmpty().forEach { shelfDao.insertShelf(it) }
                 payload.shelfPositions.orEmpty().forEach { shelfDao.insertPosition(it) }
-                payload.borrowers.orEmpty().forEach { borrowerDao.insertBorrower(it.copy(photoUri = borrowerPhotos[it.id])) }
+                payload.borrowers.orEmpty().forEach { borrower ->
+                    borrowerDao.insertBorrower(
+                        borrower.copy(
+                            photoUri = borrowerPhotos[borrower.id]
+                                ?: borrower.photoUri?.takeIf { it.startsWith("avatar:") }
+                        )
+                    )
+                }
                 books.forEach { bookDao.insertBook(it) }
                 loans.forEach { loanDao.insertLoan(it) }
                 payload.reservations.orEmpty().forEach { reservationDao.insertReservation(it) }

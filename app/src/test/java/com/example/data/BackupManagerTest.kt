@@ -99,4 +99,53 @@ class BackupManagerTest {
         assertNull(restored?.borrowers?.singleOrNull()?.photoUri)
         assertFalse(restored?.books.isNullOrEmpty())
     }
+
+    @Test
+    fun preservesHistoricalSuggestionsWhenReferencedBookWasRemoved() {
+        val payload = BackupPayload(
+            formatVersion = 2,
+            books = emptyList(),
+            loans = emptyList(),
+            borrowers = emptyList(),
+            reservations = emptyList(),
+            shelves = emptyList(),
+            shelfPositions = emptyList(),
+            weeklySuggestions = listOf(
+                WeeklySuggestionEntity(
+                    id = 1,
+                    bookId = 99,
+                    bookTitle = "Livro ausente",
+                    bookAuthor = "Autoria",
+                    professorName = "Professora",
+                    classRoom = "7º A",
+                    recommendation = "Leitura recomendada"
+                )
+            )
+        )
+
+        assertNull(BackupManager.validate(payload))
+    }
+
+    @Test
+    fun rejectsZeroIdsInPersistedBackupRecords() {
+        val payload = BackupPayload(
+            formatVersion = 1,
+            books = listOf(
+                BookEntity(
+                    id = 0,
+                    title = "Livro",
+                    author = "Autoria",
+                    genre = "Ficção",
+                    year = 2024,
+                    location = "Estante A",
+                    photoPath = null,
+                    totalQuantity = 1,
+                    availableQuantity = 1
+                )
+            ),
+            loans = emptyList()
+        )
+
+        assertTrue(BackupManager.validate(payload)?.contains("ID de livro") == true)
+    }
 }

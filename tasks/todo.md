@@ -1,43 +1,48 @@
-# EducLib 16.5.0 — auditoria, correções e release
+# EducLib 16.5.0 — auditoria e estado da publicação
 
-## Estado remoto confirmado
+## Estado confirmado em 2026-11-06 22:49 -03:00
 
-- PR #4 está integrado à `main` pelo commit `56a3f7b04862e7c93765c9a1d13a9152128b4161`.
-- `main` está no commit `66c283a028ad861f1c786f10f426d16cce330aff`, com `versionName = "16.5.0"` e `versionCode = 21`.
-- O run `42322171208` terminou com sucesso para o commit de versão; ele ocorreu antes das correções desta auditoria, então não aprova este diff.
-- A release de referência `v16.4.0` está publicada com `EducLib-16.4.0.apk` (15.017.813 bytes). Nenhuma publicação 16.5.0 está confirmada neste checklist.
-- Room permanece na versão 9, igual à 16.4.0; as correções não alteram esquema nem exigem migração. Não usar fallback destrutivo.
+- PR #4 permanece integrado à `main` pelo commit `56a3f7b`.
+- PR #5, com correções desta auditoria, foi integrado por squash em `2748e43b38482b961223a7c755cf853064812451`.
+- `main` define `versionName = "16.5.0"` e `versionCode = 21`; Room continua na versão 9, sem mudança de esquema.
+- Os checks Android CI de `push` e `pull_request` para o commit `8134abd` passaram; ambos concluíram `Run focused unit tests` e `Build Debug APK`.
+- A tag anotada `v16.5.0` foi enviada e aponta para o commit de merge `2748e43`.
+- O run de release `42325636987` passou testes, validação de secrets e build do APK assinado; validou criptograficamente os APKs 16.4.0 e 16.5.0, mas falhou porque os certificados não coincidem.
+- O gate falhou antes da verificação `aapt` dos metadados do APK e antes de criar a release. A API confirma `release not found` para `v16.5.0`; o único APK público continua sendo `EducLib-16.4.0.apk`.
 
-## Correções preparadas na branch de auditoria
+## Correções realizadas e verificadas no CI
 
-- [x] Tornar breakpoints das telas principais dependentes da largura Compose disponível; manter navegação tablet e safe insets; centralizar o token da transição de capas em 320 ms.
-- [x] Converter os ícones residuais para Material Outlined; a seta de voltar permanece `AutoMirrored.Filled` porque o artefato Compose instalado não fornece a variante Outlined autoespelhada.
-- [x] Persistir fotos selecionadas de leitores no armazenamento privado; limpar arquivos parciais se a cópia falhar; preservar avatares predefinidos no backup JSON/ZIP.
-- [x] ZIP inclui índice de mídia; exportação e importação aplicam limites simétricos e falham quando fotos locais cadastradas faltam ou estão inacessíveis; restauração limpa cópias de mídia se a transação Room falhar.
-- [x] Adicionar testes Robolectric para round-trip ZIP de capa/retrato, bytes, avatar, índice incompleto, foto ausente e restauração em Room em memória; adicionar testes para IDs inválidos e preservação de sugestões históricas. O primeiro CI revelou que Robolectric 4.16.1 não suporta API 36; o teste foi fixado em API 35 e aguarda novo CI.
-- [x] Fortalecer validação de IDs do backup e impedir que fallback de cópia parcial sobrescreva o último backup automático JSON válido.
-- [x] Atualizador valida pacote, versão/código crescente e SHA-256 do certificado contra o app instalado antes de encaminhar o APK ao instalador.
-- [x] Workflow de release exige commit contido em `main`, executa testes, confere metadados do APK e continuidade do certificado em relação à release estável anterior.
-- [x] README e este checklist atualizados; correções aprendidas registradas em `tasks/lessons.md`.
+- [x] Layouts principais adaptam-se à largura Compose disponível; navegação de tablet respeita safe insets e a transição compartilhada das capas conserva 320 ms.
+- [x] Ícones residuais passaram para Material Outlined e as variantes direcionais disponíveis foram trocadas por AutoMirrored. A seta Voltar permanece AutoMirrored Filled porque não há variante Outlined autoespelhada no artefato instalado.
+- [x] Fotos selecionadas de leitores são copiadas ao armazenamento privado; falhas de cópia removem arquivos parciais. Avatares predefinidos persistem em backup JSON/ZIP.
+- [x] ZIP contém índice de mídia; exportação/importação usam limites simétricos, detectam fotos ausentes e a restauração remove cópias locais se Room falhar.
+- [x] Testes Robolectric cobrem round-trip ZIP de capa/retrato e bytes, avatar, índice incompleto, mídia local ausente e restauração transacional em Room em memória; IDs inválidos são rejeitados e sugestões históricas sem FK são preservadas.
+- [x] O backup automático JSON não sobrescreve a última cópia válida por meio de fallback não atômico.
+- [x] O atualizador interno valida pacote/versão/código e compara o certificado SHA-256 antes de abrir o instalador.
+- [x] Workflow de release exige commit em `main`, testes, secrets, assinatura válida, metadados e continuidade do certificado antes de publicar.
+- [x] README e lições técnicas atualizados.
 
-## Gates obrigatórios antes de anunciar publicação
+## Bloqueio atual e retomada segura
 
-- [x] PR #5 da branch `audit/16.5.0` aberto; revisar diff final e integrar somente depois de todos os checks aprovados.
-- [ ] CI da branch/PR precisa compilar e passar os testes focados, inclusive `PortableMediaBackupTest`. O sandbox não tem Gradle nem Android SDK configurados; `git diff --check` e `bash -n` nos blocos dos workflows não substituem a compilação.
-- [ ] Só após merge e CI verde, criar/enviar a tag `v16.5.0`.
-- [ ] Acompanhar o workflow de release e confirmar em GitHub Releases o APK `EducLib-16.5.0.apk`, `versionName=16.5.0`, `versionCode=21`, assinatura APK válida e certificado SHA-256 idêntico ao APK 16.4.0.
-- [ ] Teste de instalação sobre 16.4.0 com dados representativos e teste visual/funcional em tablet Android real ou emulador ainda não foram executados; a responsividade/transição foram revisadas estaticamente.
+A keystore usada pelo workflow gera um APK válido, mas o certificado de assinatura é diferente daquele do APK publicado 16.4.0. O passo `Create GitHub release and attach APK` foi ignorado. **Não publicar o artefato atual, não ignorar esse gate e não trocar o `applicationId` como workaround.**
 
-## Bloqueios e proteção de dados
+1. Em GitHub → **Settings → Secrets and variables → Actions → Repository secrets**, substitua `ANDROID_KEYSTORE_BASE64` pela keystore privada exata que corresponde ao certificado do APK 16.4.0.
+2. Atualize `ANDROID_KEYSTORE_PASSWORD` e `ANDROID_KEY_PASSWORD` para as credenciais dessa keystore/chave (alias `upload`). Não compartilhe a keystore nem senhas em issues ou no chat.
+3. Reexecute o workflow falho `42325636987` para a tag existente `v16.5.0`; não é necessário criar outra tag.
+4. Só considerar publicada quando o rerun passar a comparação de assinatura e metadados, criar a release, e a página de Releases mostrar `EducLib-16.5.0.apk`. Se a keystore 16.4.0 não estiver disponível, a atualização sobre instalações existentes está bloqueada e requer recuperar a chave ou aprovar um plano explícito de migração; não há correção segura por código.
 
-- As credenciais e a verificação criptográfica da keystore são reservadas ao workflow de release; não ler nem copiar segredos para o ambiente local.
-- Se o CI falhar, corrigir e repetir CI antes do tag. Se o workflow de release falhar na comparação do certificado, confirmar que `ANDROID_KEYSTORE_BASE64` corresponde à chave da release 16.4.0; não substituir a assinatura nem desinstalar o app como workaround.
-- O ZIP contém registros e fotografias pessoais e não é criptografado; manter a confirmação de restauração e orientar armazenamento privado.
-- Sugestões semanais são denormalizadas e não têm foreign key/cascade para livros; sua referência pode continuar após a exclusão do livro. Não apagá-las automaticamente nem rejeitar esse histórico durante o backup.
+## Ainda pendente depois de resolver a chave
 
-## Fontes remotas verificadas
+- [ ] Rerun verde do release; confirmar `versionName=16.5.0`, `versionCode=21`, pacote esperado e certificado SHA-256 idêntico ao APK 16.4.0.
+- [ ] Verificar APK disponível na release pública `v16.5.0` e confirmar que o instalador aceita atualização sobre 16.4.0.
+- [ ] Teste de instalação real e inspeção visual/funcional em tablet Android/emulador ainda não foram executados; a responsividade e a transição foram revisadas estaticamente.
+
+## Fontes verificadas
 
 - [Repositório EducLib](https://github.com/nabikendo/EducLib)
 - [PR #4 integrado](https://github.com/nabikendo/EducLib/pull/4)
-- [GitHub Actions — run 42322171208](https://github.com/nabikendo/EducLib/actions/runs/42322171208)
-- [Release publicada 16.4.0 e APK de referência](https://github.com/nabikendo/EducLib/releases/tag/v16.4.0)
+- [PR #5 e correções integradas](https://github.com/nabikendo/EducLib/pull/5)
+- [CI verde por push — 42325319715](https://github.com/nabikendo/EducLib/actions/runs/42325319715)
+- [CI verde por PR — 42325324797](https://github.com/nabikendo/EducLib/actions/runs/42325324797)
+- [Release 16.4.0 e APK de referência](https://github.com/nabikendo/EducLib/releases/tag/v16.4.0)
+- [Workflow de release bloqueado — 42325636987](https://github.com/nabikendo/EducLib/actions/runs/42325636987)

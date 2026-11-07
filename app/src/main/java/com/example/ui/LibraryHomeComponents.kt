@@ -1,5 +1,7 @@
 package com.example.ui
 
+import androidx.compose.animation.animateColor
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -51,55 +53,75 @@ fun LibraryWelcomeHeader(
         bookCount == 1 -> "1 livro cadastrado"
         else -> "$bookCount livros cadastrados"
     }
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = LibrarySage,
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+    val motion = androidx.compose.animation.core.updateTransition(
+        targetState = hasSearch,
+        label = "library_header_state"
+    )
+    val background by motion.animateColor(label = "library_header_color") { searching ->
+        if (searching) com.example.ui.ipad.IpadPalette.BlueSoft
+        else com.example.ui.ipad.IpadPalette.Cream
+    }
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val wide = maxWidth >= 700.dp
+        Surface(
+            color = background,
+            shape = RoundedCornerShape(if (wide) 32.dp else 24.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Seu acervo",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = LibraryInk
-                )
-                Text(
-                    text = countLabel,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = LibraryForestDeep,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-                if (onAddBook != null) {
-                    FilledTonalButton(
-                        onClick = onAddBook,
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = Color.White,
-                            contentColor = LibraryForestDeep
-                        ),
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .testTag("add_book_button_header")
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Adicionar livro")
+            Row(
+                modifier = Modifier.padding(
+                    horizontal = if (wide) 28.dp else 20.dp,
+                    vertical = if (wide) 26.dp else 18.dp
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (hasSearch) "Resultados da busca" else "Sua biblioteca.",
+                        style = if (wide) MaterialTheme.typography.headlineLarge
+                                else MaterialTheme.typography.headlineMedium,
+                        color = com.example.ui.ipad.IpadPalette.Ink
+                    )
+                    Text(
+                        text = countLabel,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = com.example.ui.ipad.IpadPalette.SecondaryInk,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                    if (onAddBook != null) {
+                        FilledTonalButton(
+                            onClick = onAddBook,
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = com.example.ui.ipad.IpadPalette.Ink,
+                                contentColor = Color.White
+                            ),
+                            modifier = Modifier
+                                .padding(top = 14.dp)
+                                .testTag("add_book_button_header")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Adicionar livro")
+                        }
                     }
                 }
-            }
-            Surface(color = LibrarySageStrong, shape = CircleShape) {
-                Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.MenuBook,
-                        contentDescription = null,
-                        tint = LibraryForestDeep,
-                        modifier = Modifier.size(26.dp)
-                    )
+                Surface(
+                    color = com.example.ui.ipad.IpadPalette.Yellow,
+                    shape = RoundedCornerShape(if (wide) 28.dp else 22.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.size(if (wide) 112.dp else 62.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MenuBook,
+                            contentDescription = null,
+                            tint = com.example.ui.ipad.IpadPalette.Ink,
+                            modifier = Modifier.size(if (wide) 48.dp else 29.dp)
+                        )
+                    }
                 }
             }
         }

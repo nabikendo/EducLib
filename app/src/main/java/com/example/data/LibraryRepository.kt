@@ -72,10 +72,11 @@ class LibraryRepository(private val database: AppDatabase) {
         borrowerClass: String,
         quantity: Int = 1,
         loanDate: Long = System.currentTimeMillis()
-    ): Boolean {
-        val book = bookDao.getBookById(bookId) ?: return false
+    ): Boolean = database.withTransaction {
+        if (quantity <= 0) return@withTransaction false
+        val book = bookDao.getBookById(bookId) ?: return@withTransaction false
         if (book.availableQuantity < quantity) {
-            return false // Not enough copies available to loan
+            return@withTransaction false // Not enough copies available to loan
         }
 
         val studentLoanDays = configDao.getConfig("student_loan_days")?.value?.toLongOrNull() ?: 7L
@@ -104,7 +105,7 @@ class LibraryRepository(private val database: AppDatabase) {
         )
         bookDao.updateBook(updatedBook)
 
-        return true
+        return@withTransaction true
     }
 
     /**
@@ -114,10 +115,10 @@ class LibraryRepository(private val database: AppDatabase) {
         loanId: Int,
         returnedQuantity: Int = -1,
         returnDate: Long = System.currentTimeMillis()
-    ): Boolean {
-        val loan = loanDao.getLoanById(loanId) ?: return false
+    ): Boolean = database.withTransaction {
+        val loan = loanDao.getLoanById(loanId) ?: return@withTransaction false
         if (loan.returnDate != null) {
-            return false // Already returned
+            return@withTransaction false // Already returned
         }
 
         val actualReturned = if (returnedQuantity <= 0 || returnedQuantity >= loan.quantity) {
@@ -168,13 +169,13 @@ class LibraryRepository(private val database: AppDatabase) {
             }
         }
 
-        return true
+        return@withTransaction true
     }
 
     /**
      * Deletes a loan record. If it was active, returns the book copies.
      */
-    suspend fun deleteLoan(loan: LoanEntity) {
+    suspend fun deleteLoan(loan: LoanEntity) = database.withTransaction {
         loanDao.deleteLoan(loan)
         if (loan.returnDate == null) {
             val book = bookDao.getBookById(loan.bookId)
@@ -356,10 +357,10 @@ class LibraryRepository(private val database: AppDatabase) {
         )
     }
 
-    suspend fun restoreBackup(payload: BackupPayload) {
+    suspend fun restoreBackup(payload: BackupPayload, bookPhotos: Map<Int, String> = emptyMap(), borrowerPhotos: Map<Int, String> = emptyMap()) {
         require(BackupManager.validate(payload) == null) { BackupManager.validate(payload) ?: "Backup inválido." }
         val version = payload.formatVersion ?: 1
-        val books = payload.books.orEmpty().map { it.copy(photoPath = null) }
+        val books = payload.books.orEmpty().map { it.copy(photoPath = bookPhotos[it.id]) }
         val loans = payload.loans.orEmpty()
 
         database.withTransaction {
@@ -374,7 +375,7 @@ class LibraryRepository(private val database: AppDatabase) {
 
                 payload.shelves.orEmpty().forEach { shelfDao.insertShelf(it) }
                 payload.shelfPositions.orEmpty().forEach { shelfDao.insertPosition(it) }
-                payload.borrowers.orEmpty().forEach { borrowerDao.insertBorrower(it.copy(photoUri = null)) }
+                payload.borrowers.orEmpty().forEach { borrowerDao.insertBorrower(it.copy(photoUri = borrowerPhotos[it.id])) }
                 books.forEach { bookDao.insertBook(it) }
                 loans.forEach { loanDao.insertLoan(it) }
                 payload.reservations.orEmpty().forEach { reservationDao.insertReservation(it) }

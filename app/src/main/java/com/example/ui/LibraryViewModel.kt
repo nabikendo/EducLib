@@ -636,6 +636,43 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
         }
     }
 
+    fun exportPortableBackup(context: Context, uri: android.net.Uri, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                runCatching {
+                    val snapshot = repository.createBackupSnapshot()
+                    val output = context.contentResolver.openOutputStream(uri)
+                        ?: error("Não foi possível abrir o arquivo de destino.")
+                    output.use { com.example.data.PortableMediaBackup.write(context, snapshot, it) }
+                }.isSuccess
+            }
+            onResult(success)
+        }
+    }
+
+    fun restorePortableBackup(context: Context, uri: android.net.Uri, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                runCatching {
+                    val imported = com.example.data.PortableMediaBackup.read(context, uri)
+                    try {
+                        val (bookPaths, borrowerPaths) = com.example.data.PortableMediaBackup.copyToPermanent(context, imported)
+                        try {
+                            repository.restoreBackup(imported.payload, bookPaths, borrowerPaths)
+                        } catch (e: Exception) {
+                            (bookPaths.values + borrowerPaths.values).forEach { java.io.File(it).delete() }
+                            throw e
+                        }
+                    } finally {
+                        imported.stagingDir.deleteRecursively()
+                    }
+                }.isSuccess
+            }
+            if (success) triggerAutoBackup(context)
+            onResult(success)
+        }
+    }
+
     fun previewBackup(jsonString: String): BackupPreview = BackupManager.preview(jsonString)
 
     fun getShareBackupIntent(context: Context, onResult: (Intent?) -> Unit) {

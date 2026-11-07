@@ -16,6 +16,9 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.animation.*
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -1505,6 +1508,7 @@ fun GuideItem(
 }
 
 // --- TAB 1: CATALOG ---
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun CatalogTab(
     viewModel: LibraryViewModel,
@@ -1543,6 +1547,7 @@ fun CatalogTab(
     var selectedDetailBookId by rememberSaveable { mutableStateOf<Int?>(null) }
     val selectedDetailBook = books.firstOrNull { it.id == selectedDetailBookId }
 
+    SharedTransitionLayout {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
     val splitView = isTablet && maxWidth >= 850.dp
     Row(modifier = Modifier.fillMaxSize()) {
@@ -1685,6 +1690,8 @@ fun CatalogTab(
                 }
                 BookCard(
                     book = book,
+                    sharedScope = this@SharedTransitionLayout,
+                    coverVisible = !splitView || selectedDetailBookId != book.id,
                     shelfLocationText = shelfLocationText,
                     isOverdue = isOverdue,
                     onEdit = { onEditBookClick(book) },
@@ -1738,7 +1745,13 @@ fun CatalogTab(
                     Surface(
                         color = com.example.ui.ipad.IpadPalette.Yellow,
                         shape = RoundedCornerShape(22.dp),
-                        modifier = Modifier.fillMaxWidth().height(210.dp)
+                        modifier = with(this@SharedTransitionLayout) {
+                            Modifier.fillMaxWidth().height(210.dp).sharedElement(
+                                rememberSharedContentState(key = "book_cover_${book.id}"),
+                                this@AnimatedVisibility,
+                                boundsTransform = { _, _ -> androidx.compose.animation.core.tween(320) }
+                            )
+                        }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             val cover = book.photoPath?.takeIf { it.isNotBlank() }?.let { path ->
@@ -1787,6 +1800,7 @@ fun CatalogTab(
     }
     }
     }
+    }
 
     showDialogForLoanBook?.let { book ->
         LoanBookDialog(
@@ -1821,9 +1835,12 @@ fun CatalogTab(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun BookCard(
     book: BookEntity,
+    sharedScope: SharedTransitionScope? = null,
+    coverVisible: Boolean = true,
     shelfLocationText: String? = null,
     isOverdue: Boolean = false,
     onEdit: () -> Unit,
@@ -1846,13 +1863,16 @@ fun BookCard(
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             // Left panel: Book Photo
-            Box(
-                modifier = Modifier
-                    .width(110.dp)
-                    .height(190.dp)
-                    .background(ThemeBackground),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.width(110.dp).height(190.dp)) {
+            AnimatedVisibility(visible = coverVisible) {
+            val coverModifier = if (sharedScope != null) with(sharedScope) {
+                Modifier.fillMaxSize().sharedElement(
+                    rememberSharedContentState(key = "book_cover_${book.id}"),
+                    this@AnimatedVisibility,
+                    boundsTransform = { _, _ -> androidx.compose.animation.core.tween(320) }
+                )
+            } else Modifier.fillMaxSize()
+            Box(modifier = coverModifier.background(ThemeBackground), contentAlignment = Alignment.Center) {
                 val photoModel: Any? = if (!book.photoPath.isNullOrEmpty()) {
                     if (book.photoPath.startsWith("http")) book.photoPath
                     else {
@@ -1889,6 +1909,8 @@ fun BookCard(
                         )
                     }
                 }
+            }
+            }
             }
 
             // Right panel: Book details and actions

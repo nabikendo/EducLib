@@ -3519,6 +3519,18 @@ fun SettingsTab(viewModel: LibraryViewModel) {
     var passwordInput by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
 
+    var pendingPortableBackup by remember { mutableStateOf<Uri?>(null) }
+    val exportPortableLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        if (uri != null) viewModel.exportPortableBackup(context, uri) { success ->
+            Toast.makeText(context, if (success) "Backup com fotos salvo." else "Falha ao exportar backup com fotos.", Toast.LENGTH_LONG).show()
+        }
+    }
+    val importPortableLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri -> pendingPortableBackup = uri }
+
     // Backup selectors
     val selectBackupFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -4377,6 +4389,25 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                             Text("Compartilhar backup")
                         }
 
+                        Button(
+                            onClick = { exportPortableLauncher.launch("EducLib_com_fotos.edulib.zip") },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Archive, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Salvar backup completo com fotos (.zip)")
+                        }
+                        OutlinedButton(
+                            onClick = { importPortableLauncher.launch("application/zip") },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Unarchive, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Restaurar backup com fotos (.zip)")
+                        }
+
                         OutlinedButton(
                             onClick = { selectBackupFileLauncher.launch("application/json") },
                             shape = RoundedCornerShape(12.dp),
@@ -4395,6 +4426,30 @@ fun SettingsTab(viewModel: LibraryViewModel) {
             }
         }
     }
+
+        pendingPortableBackup?.let { uri ->
+            AlertDialog(
+                onDismissRequest = { if (!isRestoringBackup) pendingPortableBackup = null },
+                title = { Text("Restaurar backup completo?") },
+                text = { Text("Os cadastros atuais serão substituídos pelos dados do arquivo ZIP, incluindo as fotografias locais disponíveis. Confirme somente se deseja substituir a biblioteca atual.") },
+                confirmButton = {
+                    Button(
+                        enabled = !isRestoringBackup,
+                        onClick = {
+                            isRestoringBackup = true
+                            viewModel.restorePortableBackup(context, uri) { success ->
+                                isRestoringBackup = false
+                                pendingPortableBackup = null
+                                Toast.makeText(context, if (success) "Backup com fotos restaurado." else "Falha na restauração; confira o arquivo.", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    ) { Text(if (isRestoringBackup) "Restaurando..." else "Confirmar restauração") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingPortableBackup = null }, enabled = !isRestoringBackup) { Text("Cancelar") }
+                }
+            )
+        }
 
         pendingRestorePreview?.let { preview ->
             val createdAtText = preview.createdAt?.let {

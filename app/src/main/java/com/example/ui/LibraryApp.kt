@@ -1741,9 +1741,22 @@ fun CatalogTab(
                         modifier = Modifier.fillMaxWidth().height(210.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.MenuBook, contentDescription = null,
-                                tint = com.example.ui.ipad.IpadPalette.Ink,
-                                modifier = Modifier.size(84.dp))
+                            val cover = book.photoPath?.takeIf { it.isNotBlank() }?.let { path ->
+                                if (path.startsWith("https://") || path.startsWith("http://")) path
+                                else File(path).takeIf { it.exists() }
+                            }
+                            if (cover != null) {
+                                AsyncImage(
+                                    model = cover,
+                                    contentDescription = "Capa de ${book.title}",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Icon(Icons.Default.MenuBook, contentDescription = null,
+                                    tint = com.example.ui.ipad.IpadPalette.Ink,
+                                    modifier = Modifier.size(84.dp))
+                            }
                         }
                     }
                     Text(book.title, style = MaterialTheme.typography.headlineMedium,

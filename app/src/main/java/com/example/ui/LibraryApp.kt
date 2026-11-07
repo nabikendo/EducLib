@@ -1865,7 +1865,7 @@ fun BookCard(
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             // Left panel: Book Photo
             Box(modifier = Modifier.width(110.dp).height(190.dp)) {
-            AnimatedVisibility(visible = coverVisible) {
+            androidx.compose.animation.AnimatedVisibility(visible = coverVisible) {
             val coverModifier = if (sharedScope != null) with(sharedScope) {
                 Modifier.fillMaxSize().sharedElement(
                     rememberSharedContentState(key = "book_cover_${book.id}"),

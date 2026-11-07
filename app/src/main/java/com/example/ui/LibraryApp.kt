@@ -809,174 +809,79 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
         val isTablet = maxWidth > 600.dp
 
         if (isTablet) {
-            // Tablet layout: Side drawer/navigation layout
-            Row(modifier = Modifier.fillMaxSize()) {
+            val palette = com.example.ui.ipad.IpadPalette
+            Row(modifier = Modifier.fillMaxSize().background(palette.Canvas)) {
                 Surface(
-                    modifier = Modifier
-                        .width(240.dp)
-                        .fillMaxHeight(),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, ThemeBorder)
+                    modifier = Modifier.width(if (maxWidth >= 900.dp) 238.dp else 200.dp).fillMaxHeight(),
+                    color = palette.Sidebar
                 ) {
                     Column(
-                        modifier = Modifier
-                            .padding(vertical = 24.dp, horizontal = 16.dp)
-                            .fillMaxSize()
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 24.dp)
                     ) {
-                        // Brand header details
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(bottom = 32.dp)
+                            modifier = Modifier.padding(start = 8.dp, bottom = 32.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(ThemeBackground),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.LocalLibrary,
-                                    contentDescription = "Library App Logo",
-                                    tint = ThemePurplePrimary,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                            Surface(color = palette.Yellow, shape = RoundedCornerShape(16.dp)) {
+                                Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.LocalLibrary, contentDescription = null,
+                                        tint = palette.Ink, modifier = Modifier.size(27.dp))
+                                }
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(Modifier.width(12.dp))
                             Column {
-                                Text(
-                                    text = "EducLib",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = ThemeOnBackground
-                                )
-                                Text(
-                                    text = "Modo Offline",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ThemeSecondaryText
-                                )
+                                Text("EducLib", color = Color.White, fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium)
+                                Text("BIBLIOTECA", color = Color.LightGray,
+                                    style = MaterialTheme.typography.labelSmall)
                             }
                         }
-
-                        // Tablet Navigation Items (Drawer list elements)
-                        NavigationDrawerItem(
-                            label = { Text("Acervo Geral") },
-                            selected = selectedTab == 0 && !isAddingBookRoute && bookToEdit == null,
-                            onClick = {
-                                selectedTab = 0
-                                isAddingBookRoute = false
-                                bookToEdit = null
-                            },
-                            icon = { Icon(Icons.Default.MenuBook, contentDescription = null) },
-                            colors = NavigationDrawerItemDefaults.colors(
-                                selectedContainerColor = BentoLilacSecondary,
-                                selectedTextColor = BentoLilacSecondaryOn,
-                                selectedIconColor = ThemePurplePrimary,
-                                unselectedTextColor = ThemeSecondaryText,
-                                unselectedIconColor = ThemeSecondaryText
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.padding(bottom = 8.dp)
+                        Text("MENU", modifier = Modifier.padding(start = 12.dp, bottom = 12.dp),
+                            color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
+                        val entries = listOf(
+                            Triple("Acervo", Icons.Default.MenuBook, 0),
+                            Triple("Empréstimos", Icons.Default.SwapHoriz, 1),
+                            Triple("Leitores", Icons.Default.People, 2),
+                            Triple("Configurações", Icons.Default.Settings, 3)
                         )
-
-                        NavigationDrawerItem(
-                            label = { Text("Circulação / Empréstimos") },
-                            selected = selectedTab == 1 && !isAddingBookRoute && bookToEdit == null,
-                            onClick = {
-                                selectedTab = 1
-                                isAddingBookRoute = false
-                                bookToEdit = null
-                            },
-                            icon = { Icon(Icons.Default.SwapHoriz, contentDescription = null) },
-                            colors = NavigationDrawerItemDefaults.colors(
-                                selectedContainerColor = BentoLilacSecondary,
-                                selectedTextColor = BentoLilacSecondaryOn,
-                                selectedIconColor = ThemePurplePrimary,
-                                unselectedTextColor = ThemeSecondaryText,
-                                unselectedIconColor = ThemeSecondaryText
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        NavigationDrawerItem(
-                            label = { Text("Alunos & Professores") },
-                            selected = selectedTab == 2 && !isAddingBookRoute && bookToEdit == null,
-                            onClick = {
-                                selectedTab = 2
-                                isAddingBookRoute = false
-                                bookToEdit = null
-                            },
-                            icon = { Icon(Icons.Default.People, contentDescription = null) },
-                            colors = NavigationDrawerItemDefaults.colors(
-                                selectedContainerColor = BentoLilacSecondary,
-                                selectedTextColor = BentoLilacSecondaryOn,
-                                selectedIconColor = ThemePurplePrimary,
-                                unselectedTextColor = ThemeSecondaryText,
-                                unselectedIconColor = ThemeSecondaryText
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        NavigationDrawerItem(
-                            label = { Text("Configurações & Backup") },
-                            selected = selectedTab == 3 && !isAddingBookRoute && bookToEdit == null,
-                            onClick = {
-                                selectedTab = 3
-                                isAddingBookRoute = false
-                                bookToEdit = null
-                            },
-                            icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                            colors = NavigationDrawerItemDefaults.colors(
-                                selectedContainerColor = BentoLilacSecondary,
-                                selectedTextColor = BentoLilacSecondaryOn,
-                                selectedIconColor = ThemePurplePrimary,
-                                unselectedTextColor = ThemeSecondaryText,
-                                unselectedIconColor = ThemeSecondaryText
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = LibrarySage),
-                            border = BorderStroke(1.dp, ThemeBorder.copy(alpha = 0.45f)),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = "Acesso sem conta",
+                        entries.forEach { (label, icon, tab) ->
+                            val selected = selectedTab == tab && !isAddingBookRoute && bookToEdit == null
+                            NavigationDrawerItem(
+                                label = { Text(label) },
+                                selected = selected,
+                                onClick = {
+                                    selectedTab = tab
+                                    isAddingBookRoute = false
+                                    bookToEdit = null
+                                },
+                                icon = { Icon(icon, contentDescription = null) },
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    selectedContainerColor = palette.Yellow,
+                                    selectedTextColor = palette.Ink,
+                                    selectedIconColor = palette.Ink,
+                                    unselectedTextColor = Color.White,
+                                    unselectedIconColor = Color.LightGray
+                                ),
+                                shape = RoundedCornerShape(18.dp),
+                                modifier = Modifier.padding(bottom = 9.dp)
+                            )
+                        }
+                        Spacer(Modifier.weight(1f))
+                        Surface(color = Color(0xFF353533), shape = RoundedCornerShape(22.dp)) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                                Text("●  Biblioteca offline", color = palette.GreenSoft,
                                     fontWeight = FontWeight.Bold,
-                                    color = ThemeOnBackground
-                                )
-                                Text(
-                                    text = "Seus dados ficam guardados neste aparelho.",
+                                    style = MaterialTheme.typography.labelMedium)
+                                Text("Dados armazenados neste tablet",
+                                    color = Color.LightGray,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = ThemeSecondaryText,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
+                                    modifier = Modifier.padding(top = 7.dp))
                             }
                         }
-
-                        Text(
-                            text = "EducLib · por @nabikendo",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ThemeSecondaryText,
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        )
                     }
                 }
-
-                // Tablet screen content details
                 Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .weight(1f)
-                        .background(ThemeBackground)
+                    modifier = Modifier.weight(1f).fillMaxHeight().background(palette.Canvas)
                 ) {
                     RenderScreen(
                         selectedTab = selectedTab,

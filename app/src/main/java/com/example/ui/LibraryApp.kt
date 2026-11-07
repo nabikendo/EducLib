@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -178,7 +179,7 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.LocalLibrary,
+                        imageVector = Icons.Outlined.LocalLibrary,
                         contentDescription = "EducLib",
                         tint = ThemePurplePrimary,
                         modifier = Modifier.size(30.dp)
@@ -278,7 +279,7 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                                 onValueChange = { name = it },
                                 label = { Text("Nome Completo") },
                                 placeholder = { Text("Nome de usuário") },
-                                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF64748B)) },
+                                leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null, tint = Color(0xFF64748B)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth().testTag("setup_name_input"),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -299,7 +300,7 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                                 onValueChange = { email = it },
                                 label = { Text("E-mail") },
                                 placeholder = { Text("escola@example.com") },
-                                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = Color(0xFF64748B)) },
+                                leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = null, tint = Color(0xFF64748B)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth().testTag("setup_email_input"),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -320,7 +321,7 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                                 onValueChange = { password = it },
                                 label = { Text("Senha") },
                                 placeholder = { Text("Mínimo 4 caracteres") },
-                                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF64748B)) },
+                                leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null, tint = Color(0xFF64748B)) },
                                 visualTransformation = PasswordVisualTransformation(),
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth().testTag("setup_password_input"),
@@ -342,7 +343,7 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                                 onValueChange = { confirmPassword = it },
                                 label = { Text("Confirmar Senha") },
                                 placeholder = { Text("Repita a sua senha") },
-                                leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF64748B)) },
+                                leadingIcon = { Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = Color(0xFF64748B)) },
                                 visualTransformation = PasswordVisualTransformation(),
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth().testTag("setup_confirm_password_input"),
@@ -364,7 +365,7 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                                     onValueChange = { masterPassword = it },
                                     label = { Text("Senha Mestre") },
                                     placeholder = { Text("Sua senha de acesso local") },
-                                    leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, tint = Color(0xFF64748B)) },
+                                    leadingIcon = { Icon(Icons.Outlined.Key, contentDescription = null, tint = Color(0xFF64748B)) },
                                     visualTransformation = PasswordVisualTransformation(),
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth().testTag("password_input"),
@@ -393,7 +394,7 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                                     onValueChange = { email = it },
                                     label = { Text("E-mail") },
                                     placeholder = { Text("escola@example.com") },
-                                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = Color(0xFF64748B)) },
+                                    leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = null, tint = Color(0xFF64748B)) },
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth().testTag("login_email_input"),
                                     colors = OutlinedTextFieldDefaults.colors(
@@ -414,7 +415,7 @@ fun UnifiedAuthScreen(viewModel: LibraryViewModel, isSetupMode: Boolean) {
                                     onValueChange = { password = it },
                                     label = { Text("Senha") },
                                     placeholder = { Text("Digite sua senha") },
-                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF64748B)) },
+                                    leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null, tint = Color(0xFF64748B)) },
                                     visualTransformation = PasswordVisualTransformation(),
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth().testTag("login_password_input"),
@@ -689,7 +690,7 @@ fun GoogleSignChooserDialog(
                                     .background(ThemePurpleLight),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Outlined.Add, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(18.dp))
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
@@ -759,7 +760,7 @@ fun SetupPasswordScreen(onPasswordSaved: (String) -> Unit) {
                 modifier = Modifier.padding(24.dp).fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(Icons.Default.Lock, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(48.dp))
+                Icon(Icons.Outlined.Lock, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(48.dp))
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Configuração de Acesso", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(24.dp))
@@ -828,7 +829,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         ) {
                             Surface(color = palette.Yellow, shape = RoundedCornerShape(16.dp)) {
                                 Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Default.LocalLibrary, contentDescription = null,
+                                    Icon(Icons.Outlined.LocalLibrary, contentDescription = null,
                                         tint = palette.Ink, modifier = Modifier.size(27.dp))
                                 }
                             }
@@ -910,7 +911,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                             onClick = { isAddingBookRoute = true },
                             containerColor = ThemePurplePrimary,
                             contentColor = Color.White,
-                            icon = { Icon(Icons.Default.Add, contentDescription = "Adicionar Livro") },
+                            icon = { Icon(Icons.Outlined.Add, contentDescription = "Adicionar Livro") },
                             text = { Text("Adicionar Livro") },
                             modifier = Modifier.testTag("fab_add_book")
                         )
@@ -928,7 +929,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                                 isAddingBookRoute = false
                                 bookToEdit = null
                             },
-                            icon = { Icon(Icons.Default.MenuBook, contentDescription = "Acervo") },
+                            icon = { Icon(Icons.Outlined.MenuBook, contentDescription = "Acervo") },
                             label = { Text("Acervo") },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = ThemePurplePrimary,
@@ -946,7 +947,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                                 isAddingBookRoute = false
                                 bookToEdit = null
                             },
-                            icon = { Icon(Icons.Default.SwapHoriz, contentDescription = "Empréstimos") },
+                            icon = { Icon(Icons.Outlined.SwapHoriz, contentDescription = "Empréstimos") },
                             label = { Text("Empréstimos") },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = ThemePurplePrimary,
@@ -964,7 +965,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                                 isAddingBookRoute = false
                                 bookToEdit = null
                             },
-                            icon = { Icon(Icons.Default.People, contentDescription = "Leitores") },
+                            icon = { Icon(Icons.Outlined.People, contentDescription = "Leitores") },
                             label = { Text("Leitores") },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = ThemePurplePrimary,
@@ -982,7 +983,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                                 isAddingBookRoute = false
                                 bookToEdit = null
                             },
-                            icon = { Icon(Icons.Default.Settings, contentDescription = "Config") },
+                            icon = { Icon(Icons.Outlined.Settings, contentDescription = "Config") },
                             label = { Text("Config") },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = ThemePurplePrimary,
@@ -1385,7 +1386,7 @@ fun BentoStats(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.TrendingUp,
+                    imageVector = Icons.Outlined.TrendingUp,
                     contentDescription = null,
                     tint = ThemePurplePrimary,
                     modifier = Modifier.size(16.dp)
@@ -1422,7 +1423,7 @@ fun LibrarianPocketGuide() {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.Help,
+                        imageVector = Icons.Outlined.Help,
                         contentDescription = null,
                         tint = ThemePurplePrimary,
                         modifier = Modifier.size(20.dp)
@@ -1449,22 +1450,22 @@ fun LibrarianPocketGuide() {
                 
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     GuideItem(
-                        icon = Icons.Default.Book,
+                        icon = Icons.Outlined.Book,
                         title = "Como Registrar um Empréstimo?",
                         desc = "Toque em qualquer livro abaixo, toque no botão 'Emprestar', digite o nome do leitor (Aluno ou Professor) e confirme. O prazo é calculado de forma totalmente automática!"
                     )
                     GuideItem(
-                        icon = Icons.Default.KeyboardReturn,
+                        icon = Icons.Outlined.KeyboardReturn,
                         title = "Como Registrar Devolução ou Renovação?",
                         desc = "Vá na aba 'Empréstimos', encontre o empréstimo na lista e clique em 'Devolver' ou 'Renovar (+7 dias)'. Se houver atraso, o app mostrará um alerta vermelho."
                     )
                     GuideItem(
-                        icon = Icons.Default.Send,
+                        icon = Icons.Outlined.Send,
                         title = "Como Notificar Leitor sobre Atraso via WhatsApp?",
                         desc = "Nos empréstimos atrasados, toque no botão verde 'Alertar WhatsApp'. Você poderá revisar e editar o texto pré-criado e abrir o WhatsApp para enviar em 1 clique."
                     )
                     GuideItem(
-                        icon = Icons.Default.Layers,
+                        icon = Icons.Outlined.Layers,
                         title = "Como Localizar um Livro nas Estantes?",
                         desc = "Na caixa de busca acima, digite o nome da estante (ex: 'Estante A') ou coordenada (ex: 'C1') na busca acima para ver na hora todos os livros que estão guardados lá fisicamente."
                     )
@@ -1629,7 +1630,7 @@ fun CatalogTab(
                                 .background(LibrarySage),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.MenuBook, contentDescription = null, tint = LibraryForest, modifier = Modifier.size(28.dp))
+                            Icon(Icons.Outlined.MenuBook, contentDescription = null, tint = LibraryForest, modifier = Modifier.size(28.dp))
                         }
                         Text(
                             text = when {
@@ -1657,7 +1658,7 @@ fun CatalogTab(
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                                 shape = RoundedCornerShape(16.dp)
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null)
+                                Icon(Icons.Outlined.Add, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Cadastrar primeiro livro")
                             }
@@ -1739,7 +1740,7 @@ fun CatalogTab(
                             style = MaterialTheme.typography.titleLarge,
                             color = com.example.ui.ipad.IpadPalette.Ink)
                         IconButton(onClick = { selectedDetailBookId = null }) {
-                            Icon(Icons.Default.Close, contentDescription = "Fechar detalhes")
+                            Icon(Icons.Outlined.Close, contentDescription = "Fechar detalhes")
                         }
                     }
                     Surface(
@@ -1766,7 +1767,7 @@ fun CatalogTab(
                                     modifier = Modifier.fillMaxSize()
                                 )
                             } else {
-                                Icon(Icons.Default.MenuBook, contentDescription = null,
+                                Icon(Icons.Outlined.MenuBook, contentDescription = null,
                                     tint = com.example.ui.ipad.IpadPalette.Ink,
                                     modifier = Modifier.size(84.dp))
                             }
@@ -1895,7 +1896,7 @@ fun BookCard(
                         modifier = Modifier.padding(8.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Book,
+                            imageVector = Icons.Outlined.Book,
                             contentDescription = "Cover Placeholder",
                             tint = ThemeSecondaryText.copy(alpha = 0.5f),
                             modifier = Modifier.size(40.dp)
@@ -1943,7 +1944,7 @@ fun BookCard(
                                 modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.MoreVert,
+                                    Icons.Outlined.MoreVert,
                                     contentDescription = "Mais opções para ${book.title}"
                                 )
                             }
@@ -1953,12 +1954,12 @@ fun BookCard(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text("Editar livro") },
-                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                    leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
                                     onClick = { showBookActions = false; onEdit() }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Excluir livro") },
-                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                    leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
                                     onClick = { showBookActions = false; onDelete() }
                                 )
                             }
@@ -1982,7 +1983,7 @@ fun BookCard(
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Layers,
+                                imageVector = Icons.Outlined.Layers,
                                 contentDescription = null,
                                 tint = ThemePurplePrimary,
                                 modifier = Modifier.size(16.dp)
@@ -2003,7 +2004,7 @@ fun BookCard(
                             modifier = Modifier.padding(top = 4.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Place,
+                                imageVector = Icons.Outlined.Place,
                                 contentDescription = null,
                                 tint = ThemeSecondaryText,
                                 modifier = Modifier.size(16.dp)
@@ -2044,7 +2045,7 @@ fun BookCard(
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(
-                                            imageVector = Icons.Default.Warning,
+                                            imageVector = Icons.Outlined.Warning,
                                             contentDescription = "Possui cópias em atraso",
                                             tint = StatusOverdueRedText,
                                             modifier = Modifier.size(14.dp)
@@ -2196,7 +2197,7 @@ fun LoanBookDialog(
                             trailingIcon = {
                                 IconButton(onClick = { dropdownExpanded = !dropdownExpanded }) {
                                     Icon(
-                                        imageVector = if (dropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                        imageVector = if (dropdownExpanded) Icons.Outlined.ArrowDropUp else Icons.Outlined.ArrowDropDown,
                                         contentDescription = "Alternar menu"
                                     )
                                 }
@@ -2278,7 +2279,7 @@ fun LoanBookDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Check,
+                                imageVector = Icons.Outlined.Check,
                                 contentDescription = "Selecionado",
                                 tint = StatusAvailableGreenText,
                                 modifier = Modifier.size(20.dp)
@@ -2320,7 +2321,7 @@ fun LoanBookDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = if (isBlockedByPenalidade) Icons.Default.Block else Icons.Default.Warning,
+                                    imageVector = if (isBlockedByPenalidade) Icons.Outlined.Block else Icons.Outlined.Warning,
                                     contentDescription = "Atenção",
                                     tint = StatusOverdueRedText,
                                     modifier = Modifier.size(24.dp)
@@ -2365,7 +2366,7 @@ fun LoanBookDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Event,
+                                imageVector = Icons.Outlined.Event,
                                 contentDescription = "Prazo de Devolução",
                                 tint = ThemePurplePrimary,
                                 modifier = Modifier.size(20.dp)
@@ -2468,7 +2469,7 @@ fun LoanBookDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Warning,
+                                    imageVector = Icons.Outlined.Warning,
                                     contentDescription = "Aviso",
                                     tint = StatusOverdueRedText,
                                     modifier = Modifier.size(18.dp)
@@ -2498,7 +2499,7 @@ fun LoanBookDialog(
                                     .heightIn(min = 52.dp)
                                     .testTag("quick_register_borrower_button")
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = if (borrowerName.isNotBlank()) "Cadastrar \"$borrowerName\"" else "Novo Perfil de Leitor",
@@ -2571,7 +2572,7 @@ fun LoanBookDialog(
                                     }
                                     if (matchedBorrower?.id == borrower.id) {
                                         Icon(
-                                            imageVector = Icons.Default.Check,
+                                            imageVector = Icons.Outlined.Check,
                                             contentDescription = "Selecionado",
                                             tint = ThemePurplePrimary,
                                             modifier = Modifier.size(16.dp)
@@ -2735,11 +2736,11 @@ fun LoansTab(viewModel: LibraryViewModel) {
                 value = loanSearchQuery,
                 onValueChange = { loanSearchQuery = it },
                 placeholder = { Text("Buscar por título de livro, nome do leitor ou turma...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ThemeSecondaryText) },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = ThemeSecondaryText) },
                 trailingIcon = {
                     if (loanSearchQuery.isNotEmpty()) {
                         IconButton(onClick = { loanSearchQuery = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
+                            Icon(Icons.Outlined.Clear, contentDescription = "Limpar busca")
                         }
                     }
                 },
@@ -2829,7 +2830,7 @@ fun LoansTab(viewModel: LibraryViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Schedule,
+                                    imageVector = Icons.Outlined.Schedule,
                                     contentDescription = null,
                                     tint = ThemeSecondaryText,
                                     modifier = Modifier.size(32.dp)
@@ -2897,7 +2898,7 @@ fun LoansTab(viewModel: LibraryViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.SwapHoriz,
+                                    imageVector = Icons.Outlined.SwapHoriz,
                                     contentDescription = null,
                                     tint = ThemeSecondaryText,
                                     modifier = Modifier.size(32.dp)
@@ -3045,7 +3046,7 @@ fun LoanCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Warning,
+                        imageVector = Icons.Outlined.Warning,
                         contentDescription = null,
                         tint = StatusOverdueRedText,
                         modifier = Modifier.size(16.dp)
@@ -3149,7 +3150,7 @@ fun LoanCard(
                         modifier = Modifier.size(28.dp).testTag("print_loan_pdf_btn_${loan.id}")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Print,
+                            imageVector = Icons.Outlined.Print,
                             contentDescription = "Imprimir ou Salvar PDF",
                             tint = ThemePurplePrimary,
                             modifier = Modifier.size(16.dp)
@@ -3171,7 +3172,7 @@ fun LoanCard(
                         modifier = Modifier.size(28.dp).testTag("share_loan_pdf_btn_${loan.id}")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Share,
+                            imageVector = Icons.Outlined.Share,
                             contentDescription = "Compartilhar Comprovante PDF",
                             tint = ThemePurplePrimary,
                             modifier = Modifier.size(16.dp)
@@ -3213,7 +3214,7 @@ fun LoanCard(
                         modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Assignment,
+                            imageVector = Icons.Outlined.Assignment,
                             contentDescription = "Compartilhar Texto",
                             tint = ThemeSecondaryText,
                             modifier = Modifier.size(16.dp)
@@ -3226,7 +3227,7 @@ fun LoanCard(
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Send,
+                                imageVector = Icons.Outlined.Send,
                                 contentDescription = "WhatsApp",
                                 tint = StatusAvailableGreenText,
                                 modifier = Modifier.size(16.dp)
@@ -3235,7 +3236,7 @@ fun LoanCard(
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                     IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Excluir Registro", tint = ThemeSecondaryText.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
+                        Icon(Icons.Outlined.Delete, contentDescription = "Excluir Registro", tint = ThemeSecondaryText.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -3337,7 +3338,7 @@ fun LoanCard(
                                 modifier = Modifier.height(28.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Send,
+                                    imageVector = Icons.Outlined.Send,
                                     contentDescription = null,
                                     tint = Color.White,
                                     modifier = Modifier.size(12.dp)
@@ -3396,7 +3397,7 @@ fun OverdueWhatsAppDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Send,
+                    imageVector = Icons.Outlined.Send,
                     contentDescription = null,
                     tint = StatusAvailableGreenText,
                     modifier = Modifier.size(24.dp)
@@ -3708,7 +3709,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                                 modifier = Modifier.size(24.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Logout,
+                                    imageVector = Icons.Outlined.Logout,
                                     contentDescription = "Desconectar",
                                     tint = Color.Red.copy(alpha = 0.7f),
                                     modifier = Modifier.size(16.dp)
@@ -3726,7 +3727,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (isBiometricAvailable) Icons.Default.Face else Icons.Default.Lock,
+                            imageVector = if (isBiometricAvailable) Icons.Outlined.Face else Icons.Outlined.Lock,
                             contentDescription = "Lock Icon",
                             tint = ThemePurplePrimary,
                             modifier = Modifier.size(38.dp)
@@ -3825,7 +3826,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                                 shape = RoundedCornerShape(14.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Fingerprint,
+                                    imageVector = Icons.Outlined.Fingerprint,
                                     contentDescription = "Digital",
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -3855,7 +3856,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                             shape = RoundedCornerShape(14.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Key,
+                                imageVector = Icons.Outlined.Key,
                                 contentDescription = "Validar",
                                 modifier = Modifier.size(18.dp)
                                     .graphicsLayer { rotationZ = -45f }
@@ -3913,7 +3914,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                         modifier = Modifier.size(44.dp).clip(CircleShape).background(LibrarySageStrong),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.LocalLibrary, contentDescription = null, tint = LibraryForest)
+                        Icon(Icons.Outlined.LocalLibrary, contentDescription = null, tint = LibraryForest)
                     }
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
@@ -3986,7 +3987,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                             .background(StatusAvailableGreenBg),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Storage, contentDescription = null, tint = StatusAvailableGreenText)
+                        Icon(Icons.Outlined.Storage, contentDescription = null, tint = StatusAvailableGreenText)
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
@@ -4030,7 +4031,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                                 .background(ThemePurpleLight),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Timer, contentDescription = null, tint = ThemePurplePrimary)
+                            Icon(Icons.Outlined.Timer, contentDescription = null, tint = ThemePurplePrimary)
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
@@ -4111,7 +4112,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                                 .background(ThemePurpleLight),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.ScreenRotation, contentDescription = null, tint = ThemePurplePrimary)
+                            Icon(Icons.Outlined.ScreenRotation, contentDescription = null, tint = ThemePurplePrimary)
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
@@ -4212,7 +4213,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                             .fillMaxWidth()
                             .height(44.dp)
                     ) {
-                        Icon(Icons.Default.TableView, contentDescription = null, tint = StatusAvailableGreenText)
+                        Icon(Icons.Outlined.TableView, contentDescription = null, tint = StatusAvailableGreenText)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Exportar Acervo (CSV)", color = StatusAvailableGreenText, fontWeight = FontWeight.Bold)
                     }
@@ -4289,7 +4290,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                             .fillMaxWidth()
                             .heightIn(min = 52.dp)
                     ) {
-                        Icon(Icons.Default.Upload, contentDescription = null, tint = Color.White)
+                        Icon(Icons.Outlined.Upload, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Selecionar e Importar Planilha (.csv)", color = Color.White, fontWeight = FontWeight.Bold)
                     }
@@ -4341,7 +4342,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Icon(Icons.Default.Notifications, contentDescription = null)
+                        Icon(Icons.Outlined.Notifications, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(if (returnRemindersEnabled) "Desativar lembretes" else "Ativar lembretes")
                     }
@@ -4384,7 +4385,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                                 .heightIn(min = 52.dp)
                                 .testTag("save_backup_button")
                         ) {
-                            Icon(Icons.Default.SaveAlt, contentDescription = null)
+                            Icon(Icons.Outlined.SaveAlt, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Salvar uma cópia")
                         }
@@ -4406,7 +4407,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                                 .heightIn(min = 52.dp)
                                 .testTag("export_backup_button")
                         ) {
-                            Icon(Icons.Default.Share, contentDescription = null)
+                            Icon(Icons.Outlined.Share, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Compartilhar backup")
                         }
@@ -4416,7 +4417,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                             modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Archive, contentDescription = null)
+                            Icon(Icons.Outlined.Archive, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text("Salvar backup completo com fotos (.zip)")
                         }
@@ -4425,7 +4426,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                             modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Unarchive, contentDescription = null)
+                            Icon(Icons.Outlined.Unarchive, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text("Restaurar backup com fotos (.zip)")
                         }
@@ -4439,7 +4440,7 @@ fun SettingsTab(viewModel: LibraryViewModel) {
                                 .testTag("restore_backup_button"),
                             border = BorderStroke(1.dp, ThemeBorder)
                         ) {
-                            Icon(Icons.Default.FileUpload, contentDescription = null, tint = ThemePurplePrimary)
+                            Icon(Icons.Outlined.FileUpload, contentDescription = null, tint = ThemePurplePrimary)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Restaurar backup", color = ThemePurplePrimary)
                         }
@@ -4814,7 +4815,7 @@ fun AddEditBookScreen(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.testTag("submit_book_form_button")
             ) {
-                Icon(Icons.Default.Check, contentDescription = null)
+                Icon(Icons.Outlined.Check, contentDescription = null)
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Salvar")
             }
@@ -5054,7 +5055,7 @@ fun AddEditBookScreen(
                             if (isSearchingIsbn) {
                                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                             } else {
-                                Icon(Icons.Default.Search, contentDescription = "Buscar ISBN", modifier = Modifier.size(18.dp))
+                                Icon(Icons.Outlined.Search, contentDescription = "Buscar ISBN", modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -5108,7 +5109,7 @@ fun AddEditBookScreen(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.AddAPhoto,
+                            imageVector = Icons.Outlined.AddAPhoto,
                             contentDescription = "Pick cover",
                             tint = ThemeSecondaryText,
                             modifier = Modifier.size(36.dp)
@@ -5136,7 +5137,7 @@ fun AddEditBookScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Search,
+                        imageVector = Icons.Outlined.Search,
                         contentDescription = null,
                         tint = ThemePurplePrimary,
                         modifier = Modifier.size(20.dp)
@@ -5266,7 +5267,7 @@ fun AddEditBookScreen(
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
-                                                    imageVector = Icons.Default.CheckCircle,
+                                                    imageVector = Icons.Outlined.CheckCircle,
                                                     contentDescription = "Selecionada",
                                                     tint = ThemePurplePrimary,
                                                     modifier = Modifier.size(24.dp)
@@ -5545,7 +5546,7 @@ fun BorrowersTab(viewModel: LibraryViewModel) {
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.testTag("add_borrower_button")
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Cadastrar")
+                        Icon(Icons.Outlined.Add, contentDescription = "Cadastrar")
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Novo Leitor", fontSize = 14.sp)
                     }
@@ -5574,7 +5575,7 @@ fun BorrowersTab(viewModel: LibraryViewModel) {
                             .fillMaxWidth()
                             .testTag("add_borrower_button")
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Cadastrar")
+                        Icon(Icons.Outlined.Add, contentDescription = "Cadastrar")
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Novo Leitor", fontSize = 14.sp)
                     }
@@ -5588,11 +5589,11 @@ fun BorrowersTab(viewModel: LibraryViewModel) {
                 value = borrowerSearchQuery,
                 onValueChange = { viewModel.searchBorrowers(it) },
                 placeholder = { Text("Buscar leitor por nome, turma ou disciplina...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ThemeSecondaryText) },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = ThemeSecondaryText) },
                 trailingIcon = {
                     if (borrowerSearchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.searchBorrowers("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
+                            Icon(Icons.Outlined.Clear, contentDescription = "Limpar busca")
                         }
                     }
                 },
@@ -5650,7 +5651,7 @@ fun BorrowersTab(viewModel: LibraryViewModel) {
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Person,
+                                imageVector = Icons.Outlined.Person,
                                 contentDescription = null,
                                 tint = ThemeSecondaryText,
                                 modifier = Modifier.size(32.dp)
@@ -5688,7 +5689,7 @@ fun BorrowersTab(viewModel: LibraryViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.School,
+                                imageVector = Icons.Outlined.School,
                                 contentDescription = null,
                                 tint = ThemePurplePrimary,
                                 modifier = Modifier.size(18.dp)
@@ -5861,11 +5862,11 @@ fun BorrowerAvatar(
     val initials = if (name.isNotBlank()) name.take(2).uppercase() else "LE"
     val avatarColorAndIcon = remember(photoUri) {
         when (photoUri) {
-            "avatar:blue" -> Pair(Color(0xFF2196F3), Icons.Default.School)
-            "avatar:green" -> Pair(Color(0xFF4CAF50), Icons.Default.AutoStories)
-            "avatar:orange" -> Pair(Color(0xFFFF9800), Icons.Default.Mood)
-            "avatar:red" -> Pair(Color(0xFFE91E63), Icons.Default.LocalLibrary)
-            "avatar:indigo" -> Pair(Color(0xFF3F51B5), Icons.Default.Star)
+            "avatar:blue" -> Pair(Color(0xFF2196F3), Icons.Outlined.School)
+            "avatar:green" -> Pair(Color(0xFF4CAF50), Icons.Outlined.AutoStories)
+            "avatar:orange" -> Pair(Color(0xFFFF9800), Icons.Outlined.Mood)
+            "avatar:red" -> Pair(Color(0xFFE91E63), Icons.Outlined.LocalLibrary)
+            "avatar:indigo" -> Pair(Color(0xFF3F51B5), Icons.Outlined.Star)
             else -> null
         }
     }
@@ -5898,7 +5899,7 @@ fun BorrowerAvatar(
                 contentDescription = "Foto do Leitor",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
-                error = androidx.compose.ui.graphics.vector.rememberVectorPainter(Icons.Default.Person)
+                error = androidx.compose.ui.graphics.vector.rememberVectorPainter(Icons.Outlined.Person)
             )
         } else {
             // Initials Fallback
@@ -5992,7 +5993,7 @@ fun AddEditBorrowerDialog(
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Outlined.PhotoCamera, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Carregar da Galeria", color = ThemePurplePrimary, fontSize = 12.sp, maxLines = 1)
                             }
@@ -6004,7 +6005,7 @@ fun AddEditBorrowerDialog(
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Outlined.Delete, contentDescription = null, tint = Color.Red, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("Remover Foto", color = Color.Red, fontSize = 12.sp, maxLines = 1)
                                 }
@@ -6053,7 +6054,7 @@ fun AddEditBorrowerDialog(
                             ) {
                                 if (isSelected) {
                                     Icon(
-                                        imageVector = Icons.Default.Check,
+                                        imageVector = Icons.Outlined.Check,
                                         contentDescription = "Selecionado",
                                         tint = Color.White,
                                         modifier = Modifier.size(16.dp)
@@ -6347,13 +6348,13 @@ fun BorrowerDetailsDialog(
                             val shareIntent = Intent.createChooser(sendIntent, "Enviar Extrato para Leitor")
                             context.startActivity(shareIntent)
                         }) {
-                            Icon(Icons.Default.Share, contentDescription = "Compartilhar Extrato", tint = ThemePurplePrimary)
+                            Icon(Icons.Outlined.Share, contentDescription = "Compartilhar Extrato", tint = ThemePurplePrimary)
                         }
                         IconButton(onClick = { showCarteirinha = true }) {
-                            Icon(Icons.Default.QrCode, contentDescription = "Ver Carteirinha QR", tint = ThemePurplePrimary)
+                            Icon(Icons.Outlined.QrCode, contentDescription = "Ver Carteirinha QR", tint = ThemePurplePrimary)
                         }
                         IconButton(onClick = onEdit) {
-                            Icon(Icons.Default.Edit, contentDescription = "Editar", tint = ThemeSecondaryText)
+                            Icon(Icons.Outlined.Edit, contentDescription = "Editar", tint = ThemeSecondaryText)
                         }
                         IconButton(onClick = {
                             AlertDialogHelper.showConfirmDialog(
@@ -6366,7 +6367,7 @@ fun BorrowerDetailsDialog(
                                 }
                             )
                         }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Remover", tint = Color.Red)
+                            Icon(Icons.Outlined.Delete, contentDescription = "Remover", tint = Color.Red)
                         }
                     }
                 }
@@ -6403,7 +6404,7 @@ fun BorrowerDetailsDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp), tint = ThemeSecondaryText)
+                                Icon(Icons.Outlined.Phone, contentDescription = null, modifier = Modifier.size(16.dp), tint = ThemeSecondaryText)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(text = borrower.phone, style = MaterialTheme.typography.bodyMedium, color = ThemeSecondaryText)
                             }
@@ -6426,7 +6427,7 @@ fun BorrowerDetailsDialog(
                                 colors = ButtonDefaults.buttonColors(containerColor = StatusAvailableGreenBg)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Send,
+                                    imageVector = Icons.Outlined.Send,
                                     contentDescription = "WhatsApp",
                                     tint = StatusAvailableGreenText,
                                     modifier = Modifier.size(16.dp)
@@ -6453,7 +6454,7 @@ fun BorrowerDetailsDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Block,
+                                    imageVector = Icons.Outlined.Block,
                                     contentDescription = "Bloqueado",
                                     tint = StatusOverdueRedText,
                                     modifier = Modifier.size(24.dp)
@@ -6504,7 +6505,7 @@ fun BorrowerDetailsDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Info, contentDescription = null, tint = ThemeSecondaryText.copy(alpha = 0.5f), modifier = Modifier.size(40.dp))
+                            Icon(Icons.Outlined.Info, contentDescription = null, tint = ThemeSecondaryText.copy(alpha = 0.5f), modifier = Modifier.size(40.dp))
                             Text(
                                 text = "Nenhum histórico disponível",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -6619,7 +6620,7 @@ fun BorrowerDetailsDialog(
                                                 modifier = Modifier.size(28.dp).testTag("print_borrower_loan_${loan.id}")
                                             ) {
                                                 Icon(
-                                                    imageVector = Icons.Default.Print,
+                                                    imageVector = Icons.Outlined.Print,
                                                     contentDescription = "Imprimir PDF",
                                                     tint = ThemePurplePrimary,
                                                     modifier = Modifier.size(16.dp)
@@ -6637,7 +6638,7 @@ fun BorrowerDetailsDialog(
                                                 modifier = Modifier.size(28.dp).testTag("share_borrower_loan_${loan.id}")
                                             ) {
                                                 Icon(
-                                                    imageVector = Icons.Default.Share,
+                                                    imageVector = Icons.Outlined.Share,
                                                     contentDescription = "Compartilhar PDF",
                                                     tint = ThemePurplePrimary,
                                                     modifier = Modifier.size(16.dp)
@@ -6802,13 +6803,13 @@ fun BookDetailsDialog(
                             val shareIntent = Intent.createChooser(sendIntent, "Compartilhar Livro")
                             context.startActivity(shareIntent)
                         }) {
-                            Icon(Icons.Default.Share, contentDescription = "Compartilhar Livro", tint = ThemePurplePrimary)
+                            Icon(Icons.Outlined.Share, contentDescription = "Compartilhar Livro", tint = ThemePurplePrimary)
                         }
                         IconButton(onClick = { showFichaEtiqueta = true }) {
-                            Icon(Icons.Default.QrCode, contentDescription = "Ficha e Etiquetas", tint = ThemePurplePrimary)
+                            Icon(Icons.Outlined.QrCode, contentDescription = "Ficha e Etiquetas", tint = ThemePurplePrimary)
                         }
                         IconButton(onClick = onEdit) {
-                            Icon(Icons.Default.Edit, contentDescription = "Editar", tint = ThemeSecondaryText)
+                            Icon(Icons.Outlined.Edit, contentDescription = "Editar", tint = ThemeSecondaryText)
                         }
                         IconButton(onClick = {
                             AlertDialogHelper.showConfirmDialog(
@@ -6821,7 +6822,7 @@ fun BookDetailsDialog(
                                 }
                             )
                         }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Remover", tint = Color.Red)
+                            Icon(Icons.Outlined.Delete, contentDescription = "Remover", tint = Color.Red)
                         }
                     }
                 }
@@ -6856,7 +6857,7 @@ fun BookDetailsDialog(
                             )
                         } else {
                             Icon(
-                                imageVector = Icons.Default.Book,
+                                imageVector = Icons.Outlined.Book,
                                 contentDescription = "Placeholder",
                                 tint = ThemeSecondaryText.copy(alpha = 0.5f),
                                 modifier = Modifier.size(48.dp)
@@ -6874,7 +6875,7 @@ fun BookDetailsDialog(
                         Text(text = "Gênero: ${book.genre}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                         Text(text = "Ano: ${book.year}", style = MaterialTheme.typography.bodySmall, color = ThemeSecondaryText)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Place, contentDescription = null, tint = ThemeSecondaryText, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Outlined.Place, contentDescription = null, tint = ThemeSecondaryText, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(text = book.location, style = MaterialTheme.typography.bodySmall, color = ThemeSecondaryText)
                         }
@@ -6910,7 +6911,7 @@ fun BookDetailsDialog(
                             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Schedule,
+                                imageVector = Icons.Outlined.Schedule,
                                 contentDescription = null,
                                 tint = StatusBorrowedAmberText,
                                 modifier = Modifier.size(18.dp)
@@ -7011,7 +7012,7 @@ fun BookDetailsDialog(
                                             modifier = Modifier.size(24.dp)
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.Delete,
+                                                imageVector = Icons.Outlined.Delete,
                                                 contentDescription = "Cancelar Reserva",
                                                 tint = Color.Red,
                                                 modifier = Modifier.size(16.dp)
@@ -7030,7 +7031,7 @@ fun BookDetailsDialog(
                             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.History,
+                                imageVector = Icons.Outlined.History,
                                 contentDescription = null,
                                 tint = ThemePurplePrimary,
                                 modifier = Modifier.size(18.dp)
@@ -7093,7 +7094,7 @@ fun BookDetailsDialog(
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Icon(
-                                            imageVector = if (loan.returnDate != null) Icons.Default.CheckCircle else if (isLoanOverdue) Icons.Default.Warning else Icons.Default.Pending,
+                                            imageVector = if (loan.returnDate != null) Icons.Outlined.CheckCircle else if (isLoanOverdue) Icons.Outlined.Warning else Icons.Outlined.Pending,
                                             contentDescription = null,
                                             tint = if (loan.returnDate != null) StatusAvailableGreenText else if (isLoanOverdue) StatusOverdueRedText else ThemePurplePrimary,
                                             modifier = Modifier.size(20.dp)
@@ -7346,7 +7347,7 @@ fun LibraryInsightsDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.TrendingUp,
+                                imageVector = Icons.Outlined.TrendingUp,
                                 contentDescription = null,
                                 tint = ThemePurplePrimary,
                                 modifier = Modifier.size(20.dp)
@@ -7375,7 +7376,7 @@ fun LibraryInsightsDialog(
                             .size(36.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Clear,
+                            imageVector = Icons.Outlined.Clear,
                             contentDescription = "Fechar",
                             tint = ThemeSecondaryText,
                             modifier = Modifier.size(20.dp)
@@ -7469,7 +7470,7 @@ fun LibraryInsightsDialog(
                                 modifier = Modifier.padding(bottom = 8.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Star,
+                                    imageVector = Icons.Outlined.Star,
                                     contentDescription = null,
                                     tint = Color(0xFFFFB300),
                                     modifier = Modifier.size(18.dp)
@@ -7601,7 +7602,7 @@ fun LibraryInsightsDialog(
                                 modifier = Modifier.padding(bottom = 8.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Person,
+                                    imageVector = Icons.Outlined.Person,
                                     contentDescription = null,
                                     tint = ThemePurplePrimary,
                                     modifier = Modifier.size(18.dp)
@@ -7666,7 +7667,7 @@ fun LibraryInsightsDialog(
                                                         contentAlignment = Alignment.Center
                                                     ) {
                                                         Icon(
-                                                            imageVector = Icons.Default.Bookmark,
+                                                            imageVector = Icons.Outlined.Bookmark,
                                                             contentDescription = null,
                                                             tint = ThemePurplePrimary,
                                                             modifier = Modifier.size(14.dp)
@@ -7723,7 +7724,7 @@ fun LibraryInsightsDialog(
                                 modifier = Modifier.padding(bottom = 8.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Warning,
+                                    imageVector = Icons.Outlined.Warning,
                                     contentDescription = null,
                                     tint = StatusOverdueRedText,
                                     modifier = Modifier.size(18.dp)
@@ -7751,7 +7752,7 @@ fun LibraryInsightsDialog(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.CheckCircle,
+                                            imageVector = Icons.Outlined.CheckCircle,
                                             contentDescription = null,
                                             tint = StatusAvailableGreenText,
                                             modifier = Modifier.size(16.dp)
@@ -8055,7 +8056,7 @@ fun ReserveBookDialog(
                             trailingIcon = {
                                 IconButton(onClick = { dropdownExpanded = !dropdownExpanded }) {
                                     Icon(
-                                        imageVector = if (dropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                        imageVector = if (dropdownExpanded) Icons.Outlined.ArrowDropUp else Icons.Outlined.ArrowDropDown,
                                         contentDescription = "Alternar menu"
                                     )
                                 }
@@ -8135,7 +8136,7 @@ fun ReserveBookDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Check,
+                                imageVector = Icons.Outlined.Check,
                                 contentDescription = "Selecionado",
                                 tint = StatusAvailableGreenText,
                                 modifier = Modifier.size(20.dp)
@@ -8287,7 +8288,7 @@ fun ReservationCard(
                     modifier = Modifier.size(24.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Delete,
+                        imageVector = Icons.Outlined.Delete,
                         contentDescription = "Cancelar Reserva",
                         tint = Color.Red,
                         modifier = Modifier.size(18.dp)
@@ -8366,7 +8367,7 @@ fun ReservationCard(
                             ) {
                                 Box(modifier = Modifier.clip(RoundedCornerShape(18.dp)).background(StatusAvailableGreenBg).size(36.dp), contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Default.Send,
+                                        imageVector = Icons.Outlined.Send,
                                         contentDescription = "Notificar por WhatsApp",
                                         tint = StatusAvailableGreenText,
                                         modifier = Modifier.size(18.dp)
@@ -8383,7 +8384,7 @@ fun ReservationCard(
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Check,
+                                imageVector = Icons.Outlined.Check,
                                 contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier.size(16.dp)
@@ -8508,7 +8509,7 @@ fun CarteirinhaDialog(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.LocalLibrary,
+                            imageVector = Icons.Outlined.LocalLibrary,
                             contentDescription = null,
                             tint = ThemePurplePrimary,
                             modifier = Modifier.size(20.dp)
@@ -8682,7 +8683,7 @@ fun CarteirinhaDialog(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Compartilhar", fontSize = 13.sp)
                     }
@@ -8961,7 +8962,7 @@ fun FichaEtiquetaDialog(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Compartilhar", fontSize = 13.sp)
                     }
@@ -9136,11 +9137,11 @@ fun ScannerDialog(
                             label = { Text("Simular Leitura (Digite ou escolha da lista) *") },
                             placeholder = { Text("Selecione livro ou leitor...") },
                             singleLine = true,
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ThemeSecondaryText) },
+                            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = ThemeSecondaryText) },
                             trailingIcon = {
                                 IconButton(onClick = { dropdownExpanded = !dropdownExpanded }) {
                                     Icon(
-                                        imageVector = if (dropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                        imageVector = if (dropdownExpanded) Icons.Outlined.ArrowDropUp else Icons.Outlined.ArrowDropDown,
                                         contentDescription = "Alternar menu"
                                     )
                                 }
@@ -9188,7 +9189,7 @@ fun ScannerDialog(
                                                     .padding(horizontal = 14.dp, vertical = 10.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Icon(Icons.Default.Book, contentDescription = null, modifier = Modifier.size(16.dp), tint = ThemePurplePrimary)
+                                                Icon(Icons.Outlined.Book, contentDescription = null, modifier = Modifier.size(16.dp), tint = ThemePurplePrimary)
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text(
                                                     text = "Código Livro: ${bk.id.toString().padStart(5, '0')} - ${bk.title}",
@@ -9225,7 +9226,7 @@ fun ScannerDialog(
                                                     .padding(horizontal = 14.dp, vertical = 10.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Icon(Icons.Default.QrCode, contentDescription = null, modifier = Modifier.size(16.dp), tint = ThemePurplePrimary)
+                                                Icon(Icons.Outlined.QrCode, contentDescription = null, modifier = Modifier.size(16.dp), tint = ThemePurplePrimary)
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text(
                                                     text = "Matrícula QR: ${bor.identifier.ifBlank { bor.name }} - ${bor.name}",
@@ -9261,7 +9262,7 @@ fun ScannerDialog(
                             ) {
                                 Column(modifier = Modifier.padding(14.dp)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Book, contentDescription = null, tint = ThemePurplePrimary)
+                                        Icon(Icons.Outlined.Book, contentDescription = null, tint = ThemePurplePrimary)
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column {
                                             Text(text = "Livro Identificado", fontSize = 11.sp, color = ThemeSecondaryText, fontWeight = FontWeight.Bold)
@@ -9330,7 +9331,7 @@ fun ScannerDialog(
                             ) {
                                 Column(modifier = Modifier.padding(14.dp)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Person, contentDescription = null, tint = ThemePurplePrimary)
+                                        Icon(Icons.Outlined.Person, contentDescription = null, tint = ThemePurplePrimary)
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column {
                                             Text(text = "Leitor Identificado (Via QR Carteirinha)", fontSize = 11.sp, color = ThemeSecondaryText, fontWeight = FontWeight.Bold)
@@ -9379,7 +9380,7 @@ fun ScannerDialog(
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.CameraAlt,
+                                    imageVector = Icons.Outlined.CameraAlt,
                                     contentDescription = null,
                                     tint = ThemeSecondaryText.copy(alpha = 0.5f),
                                     modifier = Modifier.size(48.dp)
@@ -9474,13 +9475,13 @@ fun JtaRoofTab(viewModel: LibraryViewModel) {
                 selected = activeSubTab == 0,
                 onClick = { activeSubTab = 0 },
                 text = { Text("Justificativa (JTA)", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) },
-                icon = { Icon(Icons.Default.VerifiedUser, contentDescription = "JTA icon", modifier = Modifier.size(18.dp)) }
+                icon = { Icon(Icons.Outlined.VerifiedUser, contentDescription = "JTA icon", modifier = Modifier.size(18.dp)) }
             )
             Tab(
                 selected = activeSubTab == 1,
                 onClick = { activeSubTab = 1 },
                 text = { Text("Organização Estantes (ROOF)", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) },
-                icon = { Icon(Icons.Default.Layers, contentDescription = "ROOF icon", modifier = Modifier.size(18.dp)) }
+                icon = { Icon(Icons.Outlined.Layers, contentDescription = "ROOF icon", modifier = Modifier.size(18.dp)) }
             )
         }
 
@@ -9577,13 +9578,13 @@ fun JtaModuleView(viewModel: LibraryViewModel, books: List<BookEntity>) {
                 Spacer(modifier = Modifier.height(10.dp))
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.MenuBook, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.MenuBook, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(text = "Total Acervo: ${books.size} un.", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFF9800), modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Warning, contentDescription = null, tint = Color(0xFFFF9800), modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(text = "Ociosos/Baixos: ${lowCircList.size} un.", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
@@ -9599,7 +9600,7 @@ fun JtaModuleView(viewModel: LibraryViewModel, books: List<BookEntity>) {
                     colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Icon(Icons.Default.DocumentScanner, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Outlined.DocumentScanner, contentDescription = null, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Gerar Relatório JTA", fontSize = 10.sp)
                 }
@@ -9628,7 +9629,7 @@ fun JtaModuleView(viewModel: LibraryViewModel, books: List<BookEntity>) {
                 modifier = Modifier.padding(20.dp), 
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = StatusAvailableGreenText, modifier = Modifier.size(36.dp))
+                Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = StatusAvailableGreenText, modifier = Modifier.size(36.dp))
                 Spacer(modifier = Modifier.height(6.dp))
                 Text("Alta Rotatividade Geral!", fontWeight = FontWeight.Bold, color = ThemeOnBackground, fontSize = 13.sp)
                 Text("Toda a coleção registra retiradas externas contínuas regulares.", color = ThemeSecondaryText, modifier = Modifier.padding(top = 4.dp), fontSize = 11.sp, textAlign = TextAlign.Center)
@@ -9727,7 +9728,7 @@ fun JtaModuleView(viewModel: LibraryViewModel, books: List<BookEntity>) {
                             border = BorderStroke(1.dp, ThemePurplePrimary),
                             contentPadding = PaddingValues(vertical = 4.dp)
                         ) {
-                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(12.dp))
+                            Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(12.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Ajustar Parâmetros", fontSize = 10.sp, color = ThemePurplePrimary)
                         }
@@ -9739,7 +9740,7 @@ fun JtaModuleView(viewModel: LibraryViewModel, books: List<BookEntity>) {
                             border = BorderStroke(1.dp, StatusAvailableGreenText),
                             contentPadding = PaddingValues(vertical = 4.dp)
                         ) {
-                            Icon(Icons.Default.Comment, contentDescription = null, modifier = Modifier.size(12.dp))
+                            Icon(Icons.Outlined.Comment, contentDescription = null, modifier = Modifier.size(12.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Anotar Motivação", fontSize = 10.sp, color = StatusAvailableGreenText)
                         }
@@ -9810,7 +9811,7 @@ fun JtaModuleView(viewModel: LibraryViewModel, books: List<BookEntity>) {
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = StatusAvailableGreenText)
                         ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Copiar Tudo", fontSize = 12.sp)
                         }
@@ -10112,7 +10113,7 @@ fun RoofModuleView(
                         colors = ButtonDefaults.buttonColors(containerColor = ThemePurplePrimary),
                         contentPadding = PaddingValues(vertical = 4.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Criar Posição", fontSize = 11.sp)
                     }
@@ -10124,7 +10125,7 @@ fun RoofModuleView(
                         colors = ButtonDefaults.buttonColors(containerColor = StatusAvailableGreenText),
                         contentPadding = PaddingValues(vertical = 4.dp)
                     ) {
-                        Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Outlined.AutoFixHigh, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Mapear Rota ROOF", fontSize = 11.sp)
                     }
@@ -10154,7 +10155,7 @@ fun RoofModuleView(
                     Toast.makeText(context, "Estante física deletada!", Toast.LENGTH_SHORT).show()
                 }
             ) {
-                Icon(Icons.Default.DeleteForever, contentDescription = "Deletar Estante", tint = StatusOverdueRedText)
+                Icon(Icons.Outlined.DeleteForever, contentDescription = "Deletar Estante", tint = StatusOverdueRedText)
             }
         }
 
@@ -10170,7 +10171,7 @@ fun RoofModuleView(
                     modifier = Modifier.padding(20.dp), 
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(Icons.Default.GridOff, contentDescription = null, tint = ThemeSecondaryText, modifier = Modifier.size(36.dp))
+                    Icon(Icons.Outlined.GridOff, contentDescription = null, tint = ThemeSecondaryText, modifier = Modifier.size(36.dp))
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("Sem posições físicas cadastradas.", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     Text("Adicione coordenadas operacionais (ex: Prateleira 1) para posicionar os exemplares.", color = ThemeSecondaryText, textAlign = TextAlign.Center, fontSize = 11.sp)
@@ -10235,7 +10236,7 @@ fun RoofModuleView(
 
                                 if (allocatedBook != null) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Book, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(14.dp))
+                                        Icon(Icons.Outlined.Book, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
                                             text = allocatedBook.title, 
@@ -10269,7 +10270,7 @@ fun RoofModuleView(
                                     Toast.makeText(context, "Posição removida com sucesso!", Toast.LENGTH_SHORT).show()
                                 }
                             ) {
-                                Icon(Icons.Default.Delete, contentDescription = "Apagar Célula", tint = StatusOverdueRedText.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+                                Icon(Icons.Outlined.Delete, contentDescription = "Apagar Célula", tint = StatusOverdueRedText.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -10416,7 +10417,7 @@ fun RoofModuleView(
                         modifier = Modifier.fillMaxWidth(),
                         trailingIcon = {
                             IconButton(onClick = { dropdownExp = !dropdownExp }) {
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                Icon(Icons.Outlined.ArrowDropDown, contentDescription = null)
                             }
                         },
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ThemePurplePrimary)
@@ -10503,7 +10504,7 @@ fun RoofModuleView(
                             .padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.HourglassBottom, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Outlined.HourglassBottom, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Column {
                             Text("Redução no Tempo de Busca Física: ~ $timeReductionPercent%", fontWeight = FontWeight.Bold, color = ThemePurplePrimary, fontSize = 12.sp)
@@ -10516,7 +10517,7 @@ fun RoofModuleView(
                     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         if (suggestedRotations.isEmpty()) {
                             Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.Celebration, contentDescription = null, tint = StatusAvailableGreenText, modifier = Modifier.size(40.dp))
+                                Icon(Icons.Outlined.Celebration, contentDescription = null, tint = StatusAvailableGreenText, modifier = Modifier.size(40.dp))
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text("Organização Ideal Registrada!", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Text("A distribuição coincide exatamente com a demanda de empréstimos física.", color = ThemeSecondaryText, textAlign = TextAlign.Center, fontSize = 11.sp)
@@ -10533,7 +10534,7 @@ fun RoofModuleView(
                                     ) {
                                         Column(modifier = Modifier.padding(10.dp)) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(16.dp))
+                                                Icon(Icons.Outlined.SwapHoriz, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(16.dp))
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text(sugest.book.title, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = ThemeOnBackground)
                                             }
@@ -10618,7 +10619,7 @@ fun WeeklySuggestionsSection(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.Lightbulb,
+                        imageVector = Icons.Outlined.Lightbulb,
                         contentDescription = null,
                         tint = ThemePurplePrimary,
                         modifier = Modifier.size(24.dp)
@@ -10638,7 +10639,7 @@ fun WeeklySuggestionsSection(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Indicar Livro", fontSize = 12.sp)
                 }
@@ -10655,7 +10656,7 @@ fun WeeklySuggestionsSection(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            imageVector = Icons.Default.AutoStories,
+                            imageVector = Icons.Outlined.AutoStories,
                             contentDescription = null,
                             tint = ThemeSecondaryText.copy(alpha = 0.5f),
                             modifier = Modifier.size(40.dp)
@@ -10726,7 +10727,7 @@ fun WeeklySuggestionsSection(
                                         modifier = Modifier.size(24.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Delete,
+                                            imageVector = Icons.Outlined.Delete,
                                             contentDescription = "Remover indicação",
                                             tint = Color.Red.copy(alpha = 0.7f),
                                             modifier = Modifier.size(16.dp)
@@ -10744,7 +10745,7 @@ fun WeeklySuggestionsSection(
                                     verticalAlignment = Alignment.Top
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.FormatQuote,
+                                        imageVector = Icons.Outlined.FormatQuote,
                                         contentDescription = null,
                                         tint = ThemePurplePrimary.copy(alpha = 0.3f),
                                         modifier = Modifier
@@ -10847,7 +10848,7 @@ fun AddSuggestionDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(displayText, color = ThemeOnBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = ThemePurplePrimary)
+                            Icon(Icons.Outlined.ArrowDropDown, contentDescription = null, tint = ThemePurplePrimary)
                         }
                     }
 

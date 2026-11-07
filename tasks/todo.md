@@ -14,7 +14,7 @@
 - [x] Converter os ícones residuais para Material Outlined; a seta de voltar permanece `AutoMirrored.Filled` porque o artefato Compose instalado não fornece a variante Outlined autoespelhada.
 - [x] Persistir fotos selecionadas de leitores no armazenamento privado; limpar arquivos parciais se a cópia falhar; preservar avatares predefinidos no backup JSON/ZIP.
 - [x] ZIP inclui índice de mídia; exportação e importação aplicam limites simétricos e falham quando fotos locais cadastradas faltam ou estão inacessíveis; restauração limpa cópias de mídia se a transação Room falhar.
-- [x] Adicionar testes Robolectric para round-trip ZIP de capa/retrato, bytes, avatar, índice incompleto, foto ausente e restauração em Room em memória; adicionar testes para IDs inválidos e preservação de sugestões históricas.
+- [x] Adicionar testes Robolectric para round-trip ZIP de capa/retrato, bytes, avatar, índice incompleto, foto ausente e restauração em Room em memória; adicionar testes para IDs inválidos e preservação de sugestões históricas. O primeiro CI revelou que Robolectric 4.16.1 não suporta API 36; o teste foi fixado em API 35 e aguarda novo CI.
 - [x] Fortalecer validação de IDs do backup e impedir que fallback de cópia parcial sobrescreva o último backup automático JSON válido.
 - [x] Atualizador valida pacote, versão/código crescente e SHA-256 do certificado contra o app instalado antes de encaminhar o APK ao instalador.
 - [x] Workflow de release exige commit contido em `main`, executa testes, confere metadados do APK e continuidade do certificado em relação à release estável anterior.

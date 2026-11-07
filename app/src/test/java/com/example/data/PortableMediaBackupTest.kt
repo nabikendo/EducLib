@@ -20,7 +20,7 @@ import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [35])
 class PortableMediaBackupTest {
     private val context: Context
         get() = ApplicationProvider.getApplicationContext()

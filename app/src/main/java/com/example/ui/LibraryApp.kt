@@ -857,7 +857,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         Text("MENU", modifier = Modifier.padding(start = 12.dp, bottom = 12.dp),
                             color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
                         val entries = listOf(
-                            Triple("Acervo", androidx.compose.material.icons.Icons.Outlined.MenuBook, 0),
+                            Triple("Acervo", androidx.compose.material.icons.Icons.AutoMirrored.Outlined.MenuBook, 0),
                             Triple("Empréstimos", androidx.compose.material.icons.Icons.Outlined.SwapHoriz, 1),
                             Triple("Leitores", androidx.compose.material.icons.Icons.Outlined.PeopleOutline, 2),
                             Triple("Configurações", androidx.compose.material.icons.Icons.Outlined.Settings, 3)
@@ -943,7 +943,7 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                                 isAddingBookRoute = false
                                 bookToEditId = null
                             },
-                            icon = { Icon(Icons.Outlined.MenuBook, contentDescription = "Acervo") },
+                            icon = { Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = "Acervo") },
                             label = { Text("Acervo") },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = ThemePurplePrimary,
@@ -1409,7 +1409,7 @@ fun BentoStats(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.TrendingUp,
+                    imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
                     contentDescription = null,
                     tint = ThemePurplePrimary,
                     modifier = Modifier.size(16.dp)
@@ -1484,7 +1484,7 @@ fun LibrarianPocketGuide() {
                         desc = "Vá na aba 'Empréstimos', encontre o empréstimo na lista e clique em 'Devolver' ou 'Renovar (+7 dias)'. Se houver atraso, o app mostrará um alerta vermelho."
                     )
                     GuideItem(
-                        icon = Icons.Outlined.Send,
+                        icon = Icons.AutoMirrored.Outlined.Send,
                         title = "Como Notificar Leitor sobre Atraso via WhatsApp?",
                         desc = "Nos empréstimos atrasados, toque no botão verde 'Alertar WhatsApp'. Você poderá revisar e editar o texto pré-criado e abrir o WhatsApp para enviar em 1 clique."
                     )
@@ -1654,7 +1654,7 @@ fun CatalogTab(
                                 .background(LibrarySage),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Outlined.MenuBook, contentDescription = null, tint = LibraryForest, modifier = Modifier.size(28.dp))
+                            Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = null, tint = LibraryForest, modifier = Modifier.size(28.dp))
                         }
                         Text(
                             text = when {
@@ -1791,7 +1791,7 @@ fun CatalogTab(
                                     modifier = Modifier.fillMaxSize()
                                 )
                             } else {
-                                Icon(Icons.Outlined.MenuBook, contentDescription = null,
+                                Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = null,
                                     tint = com.example.ui.ipad.IpadPalette.Ink,
                                     modifier = Modifier.size(84.dp))
                             }
@@ -3248,7 +3248,7 @@ fun LoanCard(
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.Send,
+                                imageVector = Icons.AutoMirrored.Outlined.Send,
                                 contentDescription = "WhatsApp",
                                 tint = StatusAvailableGreenText,
                                 modifier = Modifier.size(16.dp)
@@ -3359,7 +3359,7 @@ fun LoanCard(
                                 modifier = Modifier.height(28.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Send,
+                                    imageVector = Icons.AutoMirrored.Outlined.Send,
                                     contentDescription = null,
                                     tint = Color.White,
                                     modifier = Modifier.size(12.dp)
@@ -3418,7 +3418,7 @@ fun OverdueWhatsAppDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Send,
+                    imageVector = Icons.AutoMirrored.Outlined.Send,
                     contentDescription = null,
                     tint = StatusAvailableGreenText,
                     modifier = Modifier.size(24.dp)
@@ -6480,7 +6480,7 @@ fun BorrowerDetailsDialog(
                                 colors = ButtonDefaults.buttonColors(containerColor = StatusAvailableGreenBg)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Send,
+                                    imageVector = Icons.AutoMirrored.Outlined.Send,
                                     contentDescription = "WhatsApp",
                                     tint = StatusAvailableGreenText,
                                     modifier = Modifier.size(16.dp)
@@ -7400,7 +7400,7 @@ fun LibraryInsightsDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.TrendingUp,
+                                imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
                                 contentDescription = null,
                                 tint = ThemePurplePrimary,
                                 modifier = Modifier.size(20.dp)
@@ -8420,7 +8420,7 @@ fun ReservationCard(
                             ) {
                                 Box(modifier = Modifier.clip(RoundedCornerShape(18.dp)).background(StatusAvailableGreenBg).size(36.dp), contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Outlined.Send,
+                                        imageVector = Icons.AutoMirrored.Outlined.Send,
                                         contentDescription = "Notificar por WhatsApp",
                                         tint = StatusAvailableGreenText,
                                         modifier = Modifier.size(18.dp)
@@ -9631,7 +9631,7 @@ fun JtaModuleView(viewModel: LibraryViewModel, books: List<BookEntity>) {
                 Spacer(modifier = Modifier.height(10.dp))
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.MenuBook, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(18.dp))
+                    Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = null, tint = ThemePurplePrimary, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(text = "Total Acervo: ${books.size} un.", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
@@ -9793,7 +9793,7 @@ fun JtaModuleView(viewModel: LibraryViewModel, books: List<BookEntity>) {
                             border = BorderStroke(1.dp, StatusAvailableGreenText),
                             contentPadding = PaddingValues(vertical = 4.dp)
                         ) {
-                            Icon(Icons.Outlined.Comment, contentDescription = null, modifier = Modifier.size(12.dp))
+                            Icon(Icons.AutoMirrored.Outlined.Comment, contentDescription = null, modifier = Modifier.size(12.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Anotar Motivação", fontSize = 10.sp, color = StatusAvailableGreenText)
                         }

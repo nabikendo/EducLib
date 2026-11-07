@@ -13,3 +13,4 @@
 - Um APK de release só deve ser publicado depois de verificar o artefato final (assinatura, package, `versionName` e `versionCode`) contra a release anterior; a configuração da keystore ou o nome da tag, isoladamente, não comprovam continuidade.
 - Breakpoints calculados pela configuração de tela podem ficar obsoletos quando a janela é redimensionada ou dividida; decisões de Split View e grade devem usar a largura Compose efetivamente disponível.
 - Weekly suggestions are denormalized history with no Room foreign key or delete cascade; deleting a catalog record must not erase those recommendations or make a valid backup unrestorable. Validate persisted IDs and true Room relations, not an assumed relationship the schema does not enforce.
+- Pin Robolectric tests to an API level shipped by the pinned Robolectric dependency; a device target SDK being 36 does not mean that Robolectric 4.16.1 can emulate API 36.

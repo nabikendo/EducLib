@@ -807,12 +807,13 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isTablet = maxWidth > 600.dp
+        val isWideTablet = maxWidth >= 900.dp
 
         if (isTablet) {
             val palette = com.example.ui.ipad.IpadPalette
             Row(modifier = Modifier.fillMaxSize().background(palette.Canvas)) {
                 Surface(
-                    modifier = Modifier.width(if (maxWidth >= 900.dp) 238.dp else 200.dp).fillMaxHeight(),
+                    modifier = Modifier.width(if (isWideTablet) 238.dp else 200.dp).fillMaxHeight(),
                     color = palette.Sidebar
                 ) {
                     Column(

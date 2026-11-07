@@ -72,10 +72,11 @@ class LibraryRepository(private val database: AppDatabase) {
         borrowerClass: String,
         quantity: Int = 1,
         loanDate: Long = System.currentTimeMillis()
-    ): Boolean {
-        val book = bookDao.getBookById(bookId) ?: return false
+    ): Boolean = database.withTransaction {
+        if (quantity <= 0) return@withTransaction false
+        val book = bookDao.getBookById(bookId) ?: return@withTransaction false
         if (book.availableQuantity < quantity) {
-            return false // Not enough copies available to loan
+            return@withTransaction false // Not enough copies available to loan
         }
 
         val studentLoanDays = configDao.getConfig("student_loan_days")?.value?.toLongOrNull() ?: 7L
@@ -114,10 +115,10 @@ class LibraryRepository(private val database: AppDatabase) {
         loanId: Int,
         returnedQuantity: Int = -1,
         returnDate: Long = System.currentTimeMillis()
-    ): Boolean {
-        val loan = loanDao.getLoanById(loanId) ?: return false
+    ): Boolean = database.withTransaction {
+        val loan = loanDao.getLoanById(loanId) ?: return@withTransaction false
         if (loan.returnDate != null) {
-            return false // Already returned
+            return@withTransaction false // Already returned
         }
 
         val actualReturned = if (returnedQuantity <= 0 || returnedQuantity >= loan.quantity) {
@@ -174,7 +175,7 @@ class LibraryRepository(private val database: AppDatabase) {
     /**
      * Deletes a loan record. If it was active, returns the book copies.
      */
-    suspend fun deleteLoan(loan: LoanEntity) {
+    suspend fun deleteLoan(loan: LoanEntity) = database.withTransaction {
         loanDao.deleteLoan(loan)
         if (loan.returnDate == null) {
             val book = bookDao.getBookById(loan.bookId)

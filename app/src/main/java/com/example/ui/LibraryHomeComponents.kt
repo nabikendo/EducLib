@@ -14,11 +14,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -101,7 +101,7 @@ fun LibraryWelcomeHeader(
                                 .padding(top = 14.dp)
                                 .testTag("add_book_button_header")
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
+                            Icon(Icons.Outlined.Add, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Adicionar livro")
                         }
@@ -116,7 +116,7 @@ fun LibraryWelcomeHeader(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.MenuBook,
+                            imageVector = Icons.Outlined.MenuBook,
                             contentDescription = null,
                             tint = com.example.ui.ipad.IpadPalette.Ink,
                             modifier = Modifier.size(if (wide) 48.dp else 29.dp)
@@ -147,7 +147,7 @@ fun LibrarySearchToolbar(
             placeholder = { Text("Título ou autor") },
             leadingIcon = {
                 Icon(
-                    imageVector = Icons.Default.Search,
+                    imageVector = Icons.Outlined.Search,
                     contentDescription = null,
                     tint = LibraryForest
                 )
@@ -155,7 +155,7 @@ fun LibrarySearchToolbar(
             trailingIcon = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { onQueryChange("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
+                        Icon(Icons.Outlined.Clear, contentDescription = "Limpar busca")
                     }
                 }
             },
@@ -185,7 +185,7 @@ fun LibrarySearchToolbar(
             )
         ) {
             Icon(
-                imageVector = Icons.Default.QrCodeScanner,
+                imageVector = Icons.Outlined.QrCodeScanner,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp)
             )

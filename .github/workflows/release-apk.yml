@@ -1,30 +1,55 @@
 name: Release Android APK
-
 on:
   push:
     tags:
       - 'v*'
-
 permissions:
   contents: write
-
 jobs:
   release:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
+      - name: Ensure release commit is contained in main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "Release tags must point to a commit contained in main." >&2
+            exit 1
+          fi
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-
+      - name: Run focused unit tests
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew testDebugUnitTest --tests com.example.data.BackupManagerTest --tests com.example.data.PortableMediaBackupTest --tests com.example.reminders.LoanDueSummaryTest --stacktrace
+          else
+            gradle testDebugUnitTest --tests com.example.data.BackupManagerTest --tests com.example.data.PortableMediaBackupTest --tests com.example.reminders.LoanDueSummaryTest --stacktrace
+          fi
+      - name: Resolve previous stable release APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PREVIOUS_TAG="$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' | awk -v current="$GITHUB_REF_NAME" '$0 != current { print; exit }')"
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "Could not find a published release to compare against." >&2
+            exit 1
+          fi
+          PREVIOUS_VERSION="${PREVIOUS_TAG#v}"
+          PREVIOUS_APK="${RUNNER_TEMP}/EducLib-${PREVIOUS_VERSION}.apk"
+          gh release download "$PREVIOUS_TAG" --repo "$GITHUB_REPOSITORY" --pattern "EducLib-${PREVIOUS_VERSION}.apk" --dir "$RUNNER_TEMP"
+          test -s "$PREVIOUS_APK"
+          echo "PREVIOUS_TAG=$PREVIOUS_TAG" >> "$GITHUB_ENV"
+          echo "PREVIOUS_APK=$PREVIOUS_APK" >> "$GITHUB_ENV"
       - name: Validate release version and signing secrets
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -32,9 +57,14 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           APP_VERSION="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
+          APP_VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -n 1)"
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$APP_VERSION" ] || [ "$APP_VERSION" != "$TAG_VERSION" ]; then
             echo "Tag version must match app/build.gradle.kts versionName." >&2
+            exit 1
+          fi
+          if ! [[ "$APP_VERSION_CODE" =~ ^[0-9]+$ ]] || [ "$APP_VERSION_CODE" -le 0 ]; then
+            echo "app/build.gradle.kts must define a positive versionCode." >&2
             exit 1
           fi
           if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_PASSWORD" ]; then
@@ -44,10 +74,10 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/my-upload-key.jks"
           test -s "$RUNNER_TEMP/my-upload-key.jks"
           echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "APP_VERSION_CODE=$APP_VERSION_CODE" >> "$GITHUB_ENV"
           echo "KEYSTORE_PATH=$RUNNER_TEMP/my-upload-key.jks" >> "$GITHUB_ENV"
           echo "STORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
           echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
-
       - name: Build signed release APK
         run: |
           if [ -f "./gradlew" ]; then
@@ -56,13 +86,61 @@ jobs:
           else
             gradle assembleRelease --stacktrace
           fi
-
+      - name: Verify APK metadata and signing continuity
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [ -z "$SDK_ROOT" ] || [ ! -d "$SDK_ROOT/build-tools" ]; then
+            echo "Android SDK build-tools are unavailable on this runner." >&2
+            exit 1
+          fi
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          AAPT="$(find "$SDK_ROOT/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          if [ -z "$APKSIGNER" ] || [ -z "$AAPT" ]; then
+            echo "apksigner and aapt are required to verify a release APK." >&2
+            exit 1
+          fi
+          CURRENT_APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$CURRENT_APK"
+          "$APKSIGNER" verify --verbose "$PREVIOUS_APK"
+          "$APKSIGNER" verify --verbose "$CURRENT_APK"
+          PREVIOUS_CERT="$("$APKSIGNER" verify --print-certs "$PREVIOUS_APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          CURRENT_CERT="$("$APKSIGNER" verify --print-certs "$CURRENT_APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          if [ -z "$PREVIOUS_CERT" ] || [ -z "$CURRENT_CERT" ] || [ "$PREVIOUS_CERT" != "$CURRENT_CERT" ]; then
+            echo "Release signer does not match the previously published APK; refusing publication." >&2
+            exit 1
+          fi
+          previous_meta="$("$AAPT" dump badging "$PREVIOUS_APK" | sed -n "s/^package: name='\([^']*\)' versionCode='\([^']*\)' versionName='\([^']*\)'.*/\1 \2 \3/p" | head -n 1)"
+          current_meta="$("$AAPT" dump badging "$CURRENT_APK" | sed -n "s/^package: name='\([^']*\)' versionCode='\([^']*\)' versionName='\([^']*\)'.*/\1 \2 \3/p" | head -n 1)"
+          read -r previous_package previous_code previous_name <<< "$previous_meta"
+          read -r current_package current_code current_name <<< "$current_meta"
+          if [ -z "$previous_package" ] || [ -z "$current_package" ]; then
+            echo "Could not read APK package/version metadata." >&2
+            exit 1
+          fi
+          if [ "$current_package" != "$previous_package" ]; then
+            echo "Release applicationId differs from the previous APK." >&2
+            exit 1
+          fi
+          if [ "$current_name" != "$APP_VERSION" ] || [ "$current_code" != "$APP_VERSION_CODE" ]; then
+            echo "Built APK metadata does not match app/build.gradle.kts." >&2
+            exit 1
+          fi
+          if [ "$current_code" -le "$previous_code" ]; then
+            echo "versionCode must increase above the previous published APK." >&2
+            exit 1
+          fi
+          echo "Verified ${PREVIOUS_TAG} -> ${GITHUB_REF_NAME}: package ${current_package}, version ${current_name} (${current_code}), signer SHA-256 ${CURRENT_CERT}."
       - name: Create GitHub release and attach APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           APK_NAME="EducLib-${APP_VERSION}.apk"
           cp app/build/outputs/apk/release/app-release.apk "$APK_NAME"
-          gh release create "$GITHUB_REF_NAME" "$APK_NAME" \
-            --title "EducLib ${APP_VERSION}" \
-            --generate-notes
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$APK_NAME" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$APK_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "EducLib ${APP_VERSION}" \
+              --generate-notes
+          fi

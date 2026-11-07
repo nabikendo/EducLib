@@ -56,7 +56,9 @@ object BackupManager {
     fun toJson(snapshot: BackupSnapshot): String {
         val portableSnapshot = snapshot.copy(
             books = snapshot.books.map { it.copy(photoPath = null) },
-            borrowers = snapshot.borrowers.map { it.copy(photoUri = null) }
+            borrowers = snapshot.borrowers.map { borrower ->
+                borrower.copy(photoUri = borrower.photoUri?.takeIf { it.startsWith("avatar:") })
+            }
         )
         val payload = BackupPayload(
             formatVersion = CURRENT_FORMAT_VERSION,
@@ -121,6 +123,7 @@ object BackupManager {
         if (version !in 1..CURRENT_FORMAT_VERSION) return "Esta versão do backup não é compatível com o app."
         val books = payload.books ?: return "O arquivo não tem a lista de livros necessária."
         val loans = payload.loans ?: return "O arquivo não tem o histórico de empréstimos necessário."
+        if (books.any { it.id <= 0 } || loans.any { it.id <= 0 }) return "O backup contém um ID de livro ou empréstimo inválido."
         if (books.map { it.id }.distinct().size != books.size) return "O backup contém IDs de livros repetidos."
         if (loans.map { it.id }.distinct().size != loans.size) return "O backup contém IDs de empréstimos repetidos."
         if (books.any { it.title.isBlank() || it.author.isBlank() || it.totalQuantity < 0 || it.availableQuantity !in 0..it.totalQuantity }) {
@@ -136,11 +139,14 @@ object BackupManager {
             val shelves = payload.shelves ?: return "O backup está incompleto: falta a lista de estantes."
             val positions = payload.shelfPositions ?: return "O backup está incompleto: faltam as posições das estantes."
             if (payload.weeklySuggestions == null) return "O backup está incompleto: falta uma seção de dados."
+            val suggestions = payload.weeklySuggestions.orEmpty()
+            if (borrowers.any { it.id <= 0 } || reservations.any { it.id <= 0 } || shelves.any { it.id <= 0 } ||
+                positions.any { it.id <= 0 } || suggestions.any { it.id <= 0 }
+            ) return "O backup contém um ID de leitor, reserva, estante, posição ou sugestão inválido."
             if (borrowers.map { it.id }.distinct().size != borrowers.size) return "O backup contém IDs de leitores repetidos."
             if (reservations.map { it.id }.distinct().size != reservations.size) return "O backup contém IDs de reservas repetidos."
             if (shelves.map { it.id }.distinct().size != shelves.size) return "O backup contém IDs de estantes repetidos."
             if (positions.map { it.id }.distinct().size != positions.size) return "O backup contém IDs de posições repetidos."
-            val suggestions = payload.weeklySuggestions.orEmpty()
             if (suggestions.map { it.id }.distinct().size != suggestions.size) return "O backup contém IDs de sugestões repetidos."
             val shelfIds = shelves.map { it.id }.toSet()
             val positionIds = positions.map { it.id }.toSet()
@@ -154,14 +160,14 @@ object BackupManager {
     }
 
     fun saveAutoBackup(context: Context, snapshot: BackupSnapshot) {
-        runCatching {
-            val destination = File(context.filesDir, "library_backup_auto.json")
-            val staging = File(context.filesDir, "library_backup_auto.tmp")
+        val destination = File(context.filesDir, "library_backup_auto.json")
+        val staging = File(context.filesDir, "library_backup_auto.tmp")
+        try {
             staging.writeText(toJson(snapshot))
-            if (!staging.renameTo(destination)) {
-                staging.copyTo(destination, overwrite = true)
-                staging.delete()
-            }
+            check(staging.renameTo(destination)) { "Não foi possível substituir o backup automático anterior com segurança." }
+        } catch (exception: Exception) {
+            staging.delete()
+            android.util.Log.e("BackupManager", "Automatic backup failed; retaining the previous backup.", exception)
         }
     }
 

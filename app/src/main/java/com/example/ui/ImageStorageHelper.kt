@@ -3,45 +3,32 @@ package com.example.ui
 import android.content.Context
 import android.net.Uri
 import java.io.File
-import java.io.FileOutputStream
-import java.io.InputStream
-import java.io.OutputStream
 
 object ImageStorageHelper {
-    /**
-     * Copies an image from a system Uri to a persistent private app file.
-     * Returns the absolute file path, or null if an error occurs.
-     */
-    fun saveImageToInternalStorage(context: Context, uri: Uri): String? {
-        return try {
-            val directory = File(context.filesDir, "book_photos")
-            if (!directory.exists()) {
-                directory.mkdirs()
-            }
-
-            // Create unique filename
-            val fileName = "book_${System.currentTimeMillis()}.jpg"
-            val targetFile = File(directory, fileName)
-
-            val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-            val outputStream: OutputStream = FileOutputStream(targetFile)
-
-            if (inputStream == null) return null
-
-            val buffer = ByteArray(4096)
-            var bytesRead: Int
-            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                outputStream.write(buffer, 0, bytesRead)
-            }
-
-            inputStream.close()
-            outputStream.flush()
-            outputStream.close()
-
-            targetFile.absolutePath
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
+    /** Copies a selected image into persistent private app storage and returns its absolute path. */
+    fun saveImageToInternalStorage(
+        context: Context,
+        uri: Uri,
+        directoryName: String = "book_photos",
+        filePrefix: String = "book"
+    ): String? = runCatching {
+        val directory = File(context.filesDir, directoryName).apply {
+            check(isDirectory || mkdirs()) { "Não foi possível preparar o armazenamento de fotos." }
         }
+        val targetFile = File(directory, "${filePrefix}_${System.nanoTime()}.jpg")
+        try {
+            val input = context.contentResolver.openInputStream(uri)
+                ?: error("Não foi possível abrir a imagem selecionada.")
+            input.use { source ->
+                targetFile.outputStream().use { target -> source.copyTo(target) }
+            }
+            targetFile.absolutePath
+        } catch (exception: Exception) {
+            targetFile.delete()
+            throw exception
+        }
+    }.getOrElse { exception ->
+        android.util.Log.w("ImageStorageHelper", "Could not persist selected image.", exception)
+        null
     }
 }

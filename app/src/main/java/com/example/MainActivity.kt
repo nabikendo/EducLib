@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material3.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,7 +73,7 @@ class MainActivity : FragmentActivity() {
               horizontalAlignment = Alignment.CenterHorizontally
             ) {
               Icon(
-                imageVector = Icons.Default.Error,
+                imageVector = Icons.Outlined.Error,
                 contentDescription = "Error icon",
                 tint = Color(0xFFBA1A1A),
                 modifier = Modifier.size(64.dp)
@@ -114,4 +114,3 @@ class MainActivity : FragmentActivity() {
     }
   }
 }
-

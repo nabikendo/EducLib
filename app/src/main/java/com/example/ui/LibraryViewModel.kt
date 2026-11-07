@@ -636,23 +636,23 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
         }
     }
 
-    fun exportPortableBackup(context: Context, uri: android.net.Uri, onResult: (Boolean) -> Unit) {
+    fun exportPortableBackup(context: Context, uri: android.net.Uri, onResult: (Boolean, String?) -> Unit) {
         viewModelScope.launch {
-            val success = kotlinx.coroutines.withContext(Dispatchers.IO) {
+            val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
                 runCatching {
                     val snapshot = repository.createBackupSnapshot()
                     val output = context.contentResolver.openOutputStream(uri)
                         ?: error("Não foi possível abrir o arquivo de destino.")
                     output.use { com.example.data.PortableMediaBackup.write(context, snapshot, it) }
-                }.isSuccess
+                }
             }
-            onResult(success)
+            onResult(result.isSuccess, result.exceptionOrNull()?.localizedMessage)
         }
     }
 
-    fun restorePortableBackup(context: Context, uri: android.net.Uri, onResult: (Boolean) -> Unit) {
+    fun restorePortableBackup(context: Context, uri: android.net.Uri, onResult: (Boolean, String?) -> Unit) {
         viewModelScope.launch {
-            val success = kotlinx.coroutines.withContext(Dispatchers.IO) {
+            val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
                 runCatching {
                     val imported = com.example.data.PortableMediaBackup.read(context, uri)
                     try {
@@ -666,10 +666,10 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
                     } finally {
                         imported.stagingDir.deleteRecursively()
                     }
-                }.isSuccess
+                }
             }
-            if (success) triggerAutoBackup(context)
-            onResult(success)
+            if (result.isSuccess) triggerAutoBackup(context)
+            onResult(result.isSuccess, result.exceptionOrNull()?.localizedMessage)
         }
     }
 

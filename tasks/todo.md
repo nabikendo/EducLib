@@ -11,7 +11,7 @@
 ## Correções preparadas na branch de auditoria
 
 - [x] Tornar breakpoints das telas principais dependentes da largura Compose disponível; manter navegação tablet e safe insets; centralizar o token da transição de capas em 320 ms.
-- [x] Converter os ícones residuais, incluindo a seta de voltar, para Material Outlined.
+- [x] Converter os ícones residuais para Material Outlined; a seta de voltar permanece `AutoMirrored.Filled` porque o artefato Compose instalado não fornece a variante Outlined autoespelhada.
 - [x] Persistir fotos selecionadas de leitores no armazenamento privado; limpar arquivos parciais se a cópia falhar; preservar avatares predefinidos no backup JSON/ZIP.
 - [x] ZIP inclui índice de mídia; exportação e importação aplicam limites simétricos e falham quando fotos locais cadastradas faltam ou estão inacessíveis; restauração limpa cópias de mídia se a transação Room falhar.
 - [x] Adicionar testes Robolectric para round-trip ZIP de capa/retrato, bytes, avatar, índice incompleto, foto ausente e restauração em Room em memória; adicionar testes para IDs inválidos e preservação de sugestões históricas.
@@ -22,7 +22,7 @@
 
 ## Gates obrigatórios antes de anunciar publicação
 
-- [ ] Abrir PR da branch `audit/16.5.0`; revisar diff final e integrar após as verificações obrigatórias aprovadas.
+- [x] PR #5 da branch `audit/16.5.0` aberto; revisar diff final e integrar somente depois de todos os checks aprovados.
 - [ ] CI da branch/PR precisa compilar e passar os testes focados, inclusive `PortableMediaBackupTest`. O sandbox não tem Gradle nem Android SDK configurados; `git diff --check` e `bash -n` nos blocos dos workflows não substituem a compilação.
 - [ ] Só após merge e CI verde, criar/enviar a tag `v16.5.0`.
 - [ ] Acompanhar o workflow de release e confirmar em GitHub Releases o APK `EducLib-16.5.0.apk`, `versionName=16.5.0`, `versionCode=21`, assinatura APK válida e certificado SHA-256 idêntico ao APK 16.4.0.

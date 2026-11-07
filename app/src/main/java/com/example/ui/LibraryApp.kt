@@ -4787,11 +4787,11 @@ fun AddEditBookScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Voltar", tint = ThemePurplePrimary)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = ThemePurplePrimary)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (bookToEditId == null) "Adicionar Livro" else "Editar Livro",
+                    text = if (bookToEdit == null) "Adicionar Livro" else "Editar Livro",
                     style = MaterialTheme.typography.headlineMedium,
                     color = ThemePurplePrimary,
                     fontWeight = FontWeight.Bold
@@ -4808,7 +4808,7 @@ fun AddEditBookScreen(
                     } else if (parsedTotal <= 0) {
                         errorText = "A quantidade total deve ser maior que zero."
                     } else {
-                        if (bookToEditId == null) {
+                        if (bookToEdit == null) {
                             viewModel.addBook(
                                 context = context,
                                 title = title,
@@ -4852,7 +4852,7 @@ fun AddEditBookScreen(
         Spacer(modifier = Modifier.height(24.dp))
         
         // Auto-fill Card for New Books
-        if (bookToEditId == null) {
+        if (bookToEdit == null) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = BentoLilacSecondary),

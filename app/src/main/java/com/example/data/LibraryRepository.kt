@@ -357,10 +357,10 @@ class LibraryRepository(private val database: AppDatabase) {
         )
     }
 
-    suspend fun restoreBackup(payload: BackupPayload) {
+    suspend fun restoreBackup(payload: BackupPayload, bookPhotos: Map<Int, String> = emptyMap(), borrowerPhotos: Map<Int, String> = emptyMap()) {
         require(BackupManager.validate(payload) == null) { BackupManager.validate(payload) ?: "Backup inválido." }
         val version = payload.formatVersion ?: 1
-        val books = payload.books.orEmpty().map { it.copy(photoPath = null) }
+        val books = payload.books.orEmpty().map { it.copy(photoPath = bookPhotos[it.id]) }
         val loans = payload.loans.orEmpty()
 
         database.withTransaction {
@@ -375,7 +375,7 @@ class LibraryRepository(private val database: AppDatabase) {
 
                 payload.shelves.orEmpty().forEach { shelfDao.insertShelf(it) }
                 payload.shelfPositions.orEmpty().forEach { shelfDao.insertPosition(it) }
-                payload.borrowers.orEmpty().forEach { borrowerDao.insertBorrower(it.copy(photoUri = null)) }
+                payload.borrowers.orEmpty().forEach { borrowerDao.insertBorrower(it.copy(photoUri = borrowerPhotos[it.id])) }
                 books.forEach { bookDao.insertBook(it) }
                 loans.forEach { loanDao.insertLoan(it) }
                 payload.reservations.orEmpty().forEach { reservationDao.insertReservation(it) }

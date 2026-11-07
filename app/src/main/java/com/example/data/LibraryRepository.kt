@@ -105,7 +105,7 @@ class LibraryRepository(private val database: AppDatabase) {
         )
         bookDao.updateBook(updatedBook)
 
-        return true
+        return@withTransaction true
     }
 
     /**
@@ -169,7 +169,7 @@ class LibraryRepository(private val database: AppDatabase) {
             }
         }
 
-        return true
+        return@withTransaction true
     }
 
     /**

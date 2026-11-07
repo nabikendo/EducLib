@@ -840,10 +840,10 @@ fun MainLibraryAppContent(viewModel: LibraryViewModel) {
                         Text("MENU", modifier = Modifier.padding(start = 12.dp, bottom = 12.dp),
                             color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
                         val entries = listOf(
-                            Triple("Acervo", Icons.Default.MenuBook, 0),
-                            Triple("Empréstimos", Icons.Default.SwapHoriz, 1),
-                            Triple("Leitores", Icons.Default.People, 2),
-                            Triple("Configurações", Icons.Default.Settings, 3)
+                            Triple("Acervo", androidx.compose.material.icons.Icons.Outlined.MenuBook, 0),
+                            Triple("Empréstimos", androidx.compose.material.icons.Icons.Outlined.SwapHoriz, 1),
+                            Triple("Leitores", androidx.compose.material.icons.Icons.Outlined.PeopleOutline, 2),
+                            Triple("Configurações", androidx.compose.material.icons.Icons.Outlined.Settings, 3)
                         )
                         entries.forEach { (label, icon, tab) ->
                             val selected = selectedTab == tab && !isAddingBookRoute && bookToEdit == null

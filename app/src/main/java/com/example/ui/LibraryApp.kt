@@ -1540,14 +1540,20 @@ fun CatalogTab(
     }
     val isTablet = context.resources.configuration.smallestScreenWidthDp >= 600
     val gridCells = if (isTablet) GridCells.Adaptive(minSize = 300.dp) else GridCells.Fixed(1)
+    var selectedDetailBookId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val selectedDetailBook = books.firstOrNull { it.id == selectedDetailBookId }
 
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    val splitView = isTablet && maxWidth >= 850.dp
+    Row(modifier = Modifier.fillMaxSize()) {
     LazyVerticalGrid(
         columns = gridCells,
         contentPadding = PaddingValues(bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier
-            .fillMaxSize()
+            .weight(1f)
+            .fillMaxHeight()
             .padding(horizontal = 20.dp, vertical = 20.dp)
     ) {
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
@@ -1691,10 +1697,82 @@ fun CatalogTab(
                         )
                     },
                     onLoan = { showDialogForLoanBook = book },
-                    onCardClick = { showBookDetailsDialog = book }
+                    onCardClick = {
+                        if (splitView) selectedDetailBookId = book.id
+                        else showBookDetailsDialog = book
+                    }
                 )
             }
         }
+    }
+
+    androidx.compose.animation.AnimatedVisibility(
+        visible = splitView && selectedDetailBook != null,
+        enter = androidx.compose.animation.slideInHorizontally(
+            animationSpec = androidx.compose.animation.core.tween(320),
+            initialOffsetX = { it / 3 }
+        ) + androidx.compose.animation.fadeIn(),
+        exit = androidx.compose.animation.slideOutHorizontally(
+            animationSpec = androidx.compose.animation.core.tween(220),
+            targetOffsetX = { it / 3 }
+        ) + androidx.compose.animation.fadeOut()
+    ) {
+        selectedDetailBook?.let { book ->
+            Surface(
+                modifier = Modifier.width(360.dp).fillMaxHeight().padding(12.dp),
+                shape = RoundedCornerShape(28.dp),
+                color = com.example.ui.ipad.IpadPalette.Cream
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(22.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Detalhes", modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = com.example.ui.ipad.IpadPalette.Ink)
+                        IconButton(onClick = { selectedDetailBookId = null }) {
+                            Icon(Icons.Default.Close, contentDescription = "Fechar detalhes")
+                        }
+                    }
+                    Surface(
+                        color = com.example.ui.ipad.IpadPalette.Yellow,
+                        shape = RoundedCornerShape(22.dp),
+                        modifier = Modifier.fillMaxWidth().height(210.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.MenuBook, contentDescription = null,
+                                tint = com.example.ui.ipad.IpadPalette.Ink,
+                                modifier = Modifier.size(84.dp))
+                        }
+                    }
+                    Text(book.title, style = MaterialTheme.typography.headlineMedium,
+                        color = com.example.ui.ipad.IpadPalette.Ink)
+                    Text(book.author, style = MaterialTheme.typography.titleMedium,
+                        color = com.example.ui.ipad.IpadPalette.SecondaryInk)
+                    Text("${book.availableQuantity} de ${book.totalQuantity} exemplares disponíveis")
+                    Text("Localização: ${book.location}")
+                    Button(
+                        onClick = { showDialogForLoanBook = book },
+                        enabled = book.availableQuantity > 0,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = com.example.ui.ipad.IpadPalette.Ink,
+                            contentColor = Color.White
+                        )
+                    ) { Text("Emprestar livro") }
+                    OutlinedButton(
+                        onClick = { onEditBookClick(book) },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                    ) { Text("Editar cadastro") }
+                    TextButton(onClick = { showBookDetailsDialog = book }) {
+                        Text("Ver histórico e informações completas")
+                    }
+                }
+            }
+        }
+    }
+    }
     }
 
     showDialogForLoanBook?.let { book ->

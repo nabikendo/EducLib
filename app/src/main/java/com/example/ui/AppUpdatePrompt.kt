@@ -1,6 +1,10 @@
 package com.example.ui
 
 import android.content.Context
+import android.os.Build
+import android.provider.Settings
+import androidx.core.content.FileProvider
+import java.io.File
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
@@ -14,6 +18,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import com.example.BuildConfig
 import kotlinx.coroutines.Dispatchers
@@ -132,6 +138,43 @@ private object AppUpdateChecker {
         }
     }
 
+
+    suspend fun downloadApk(context: Context, release: AvailableRelease): Uri = withContext(Dispatchers.IO) {
+        val parsed = Uri.parse(release.apkDownloadUrl)
+        require(parsed.scheme == "https" && parsed.host == "github.com") {
+            "A atualização deve vir do GitHub por HTTPS."
+        }
+        val request = Request.Builder().url(release.apkDownloadUrl).get().build()
+        val destination = File(context.cacheDir, "educLib-update.apk")
+        val staging = File(context.cacheDir, "educLib-update.tmp")
+        try {
+            client.newCall(request).execute().use { response ->
+                check(response.isSuccessful) { "Falha no download: HTTP ${response.code}" }
+                val length = response.body?.contentLength() ?: -1L
+                check(length <= 200L * 1024 * 1024) { "O arquivo excede o limite permitido." }
+                val body = response.body ?: error("O download não contém dados.")
+                body.byteStream().use { input ->
+                    staging.outputStream().use { output ->
+                        val buffer = ByteArray(8192)
+                        var count = 0L
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            count += read
+                            check(count <= 200L * 1024 * 1024) { "Arquivo APK muito grande." }
+                            output.write(buffer, 0, read)
+                        }
+                    }
+                }
+            }
+            check(staging.length() > 0L) { "Arquivo APK vazio." }
+            check(staging.renameTo(destination)) { "Não foi possível finalizar o download." }
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", destination)
+        } finally {
+            staging.delete()
+        }
+    }
+
     private fun clearCachedRelease(preferences: SharedPreferences) {
         preferences.edit()
             .remove(KEY_CACHED_TAG)
@@ -173,10 +216,13 @@ private object AppUpdateChecker {
 @Composable
 fun AppUpdatePrompt() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val preferences = remember(context) {
         context.getSharedPreferences(UPDATE_PREFERENCES, Context.MODE_PRIVATE)
     }
     var availableRelease by remember { mutableStateOf<AvailableRelease?>(null) }
+    var downloading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         val update = AppUpdateChecker.findUpdate(context, BuildConfig.VERSION_NAME)
@@ -187,31 +233,65 @@ fun AppUpdatePrompt() {
 
     val update = availableRelease ?: return
     val dismissForLater = {
-        preferences.edit().putString(KEY_DISMISSED_TAG, update.tagName).apply()
-        availableRelease = null
+        if (!downloading) {
+            preferences.edit().putString(KEY_DISMISSED_TAG, update.tagName).apply()
+            availableRelease = null
+        }
     }
 
     AlertDialog(
         onDismissRequest = dismissForLater,
         title = { Text("Atualização disponível") },
-        text = { Text("A versão ${update.versionName} do EducLib já pode ser baixada.") },
+        text = {
+            Text(
+                when {
+                    downloading -> "Baixando a versão ${update.versionName} dentro do EducLib…"
+                    error != null -> "Não foi possível preparar a atualização: $error"
+                    else -> "Versão ${update.versionName}. O EducLib baixa o APK e solicita a confirmação de instalação do Android."
+                }
+            )
+        },
         confirmButton = {
             TextButton(
+                enabled = !downloading,
                 onClick = {
-                    val targetUrl = update.apkDownloadUrl.ifBlank { update.releasePageUrl }
-                    runCatching {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
-                    }.onFailure {
-                        Log.w("AppUpdatePrompt", "Could not open the APK download link.", it)
+                    downloading = true
+                    error = null
+                    scope.launch {
+                        try {
+                            val uri = AppUpdateChecker.downloadApk(context, update)
+                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, "application/vnd.android.package-archive")
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                                !context.packageManager.canRequestPackageInstalls()
+                            ) {
+                                val settingsIntent = Intent(
+                                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                    Uri.parse("package:${context.packageName}")
+                                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                context.startActivity(settingsIntent)
+                                error = "Autorize a instalação para o EducLib nas configurações e tente novamente."
+                            } else {
+                                context.startActivity(intent)
+                                availableRelease = null
+                            }
+                        } catch (exception: Exception) {
+                            Log.w("AppUpdatePrompt", "In-app update failed.", exception)
+                            error = exception.message ?: "Erro desconhecido."
+                        } finally {
+                            downloading = false
+                        }
                     }
-                    availableRelease = null
                 }
             ) {
-                Text("Baixar atualização")
+                Text(if (downloading) "Baixando…" else "Atualizar agora")
             }
         },
         dismissButton = {
-            TextButton(onClick = dismissForLater) {
+            TextButton(enabled = !downloading, onClick = dismissForLater) {
                 Text("Mais tarde")
             }
         }

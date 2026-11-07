@@ -3,23 +3,73 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to build (only v16.5.0 is allowed for this one-time migration)
+        required: true
+        type: string
+      allow_signing_migration:
+        description: Explicitly allow the approved certificate change for v16.5.0
+        required: true
+        type: boolean
+        default: false
+      confirm_manual_reinstall:
+        description: Confirm users of 16.4.0 must export a ZIP, uninstall, install 16.5.0, and restore
+        required: true
+        type: boolean
+        default: false
 permissions:
   contents: write
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout release source
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.release_tag || github.ref }}
           fetch-depth: 0
-      - name: Ensure release commit is contained in main
+      - name: Resolve and validate release target
+        env:
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag || '' }}
+          GH_TOKEN: ${{ github.token }}
+          INPUT_ALLOW_MIGRATION: ${{ inputs.allow_signing_migration || 'false' }}
+          INPUT_CONFIRM_REINSTALL: ${{ inputs.confirm_manual_reinstall || 'false' }}
         run: |
-          git fetch origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
-            echo "Release tags must point to a commit contained in main." >&2
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            RELEASE_TAG="$INPUT_RELEASE_TAG"
+            if [[ "$RELEASE_TAG" != "v16.5.0" ]]; then
+              echo "Manual signer migration is restricted to the approved v16.5.0 release." >&2
+              exit 1
+            fi
+            if [[ "$INPUT_ALLOW_MIGRATION" != "true" || "$INPUT_CONFIRM_REINSTALL" != "true" ]]; then
+              echo "Both signing migration and manual reinstall confirmations are required." >&2
+              exit 1
+            fi
+            ALLOW_SIGNING_MIGRATION=true
+          else
+            RELEASE_TAG="$GITHUB_REF_NAME"
+            ALLOW_SIGNING_MIGRATION=false
+          fi
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must use the vMAJOR.MINOR.PATCH format." >&2
             exit 1
           fi
+          git fetch origin main --tags
+          RELEASE_COMMIT="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          if ! git merge-base --is-ancestor "$RELEASE_COMMIT" FETCH_HEAD; then
+            echo "Release tag must point to a commit contained in main." >&2
+            exit 1
+          fi
+          if [[ "$ALLOW_SIGNING_MIGRATION" == "true" ]] && gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "A v16.5.0 release already exists; refusing to replace an APK after the one-time signer migration." >&2
+            exit 1
+          fi
+          printf 'RELEASE_TAG=%s\n' "$RELEASE_TAG" >> "$GITHUB_ENV"
+          printf 'RELEASE_COMMIT=%s\n' "$RELEASE_COMMIT" >> "$GITHUB_ENV"
+          printf 'ALLOW_SIGNING_MIGRATION=%s\n' "$ALLOW_SIGNING_MIGRATION" >> "$GITHUB_ENV"
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -39,7 +89,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PREVIOUS_TAG="$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' | awk -v current="$GITHUB_REF_NAME" '$0 != current { print; exit }')"
+          PREVIOUS_TAG="$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' | awk -v current="$RELEASE_TAG" '$0 != current { print; exit }')"
           if [ -z "$PREVIOUS_TAG" ]; then
             echo "Could not find a published release to compare against." >&2
             exit 1
@@ -56,9 +106,10 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
           APP_VERSION="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
           APP_VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -n 1)"
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${RELEASE_TAG#v}"
           if [ -z "$APP_VERSION" ] || [ "$APP_VERSION" != "$TAG_VERSION" ]; then
             echo "Tag version must match app/build.gradle.kts versionName." >&2
             exit 1
@@ -88,6 +139,7 @@ jobs:
           fi
       - name: Verify APK metadata and signing continuity
         run: |
+          set -euo pipefail
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
           if [ -z "$SDK_ROOT" ] || [ ! -d "$SDK_ROOT/build-tools" ]; then
             echo "Android SDK build-tools are unavailable on this runner." >&2
@@ -105,14 +157,28 @@ jobs:
           "$APKSIGNER" verify --verbose "$CURRENT_APK"
           PREVIOUS_CERT="$("$APKSIGNER" verify --print-certs "$PREVIOUS_APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
           CURRENT_CERT="$("$APKSIGNER" verify --print-certs "$CURRENT_APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
-          if [ -z "$PREVIOUS_CERT" ] || [ -z "$CURRENT_CERT" ] || [ "$PREVIOUS_CERT" != "$CURRENT_CERT" ]; then
-            echo "Release signer does not match the previously published APK; refusing publication." >&2
+          if [ -z "$PREVIOUS_CERT" ] || [ -z "$CURRENT_CERT" ]; then
+            echo "Could not extract the APK signing certificate fingerprints." >&2
             exit 1
           fi
-          previous_meta="$("$AAPT" dump badging "$PREVIOUS_APK" | sed -n "s/^package: name='\([^']*\)' versionCode='\([^']*\)' versionName='\([^']*\)'.*/\1 \2 \3/p" | head -n 1)"
-          current_meta="$("$AAPT" dump badging "$CURRENT_APK" | sed -n "s/^package: name='\([^']*\)' versionCode='\([^']*\)' versionName='\([^']*\)'.*/\1 \2 \3/p" | head -n 1)"
-          read -r previous_package previous_code previous_name <<< "$previous_meta"
-          read -r current_package current_code current_name <<< "$current_meta"
+          if [ "$PREVIOUS_CERT" != "$CURRENT_CERT" ]; then
+            if [ "$ALLOW_SIGNING_MIGRATION" != "true" ] || [ "$RELEASE_TAG" != "v16.5.0" ]; then
+              echo "Release signer differs from the previously published APK; refusing publication." >&2
+              exit 1
+            fi
+            echo "Approved one-time signer migration: existing 16.4.0 installs require ZIP export, uninstall, install, and ZIP restore." >&2
+            echo "SIGNATURE_MIGRATION=true" >> "$GITHUB_ENV"
+          else
+            if [ "$ALLOW_SIGNING_MIGRATION" == "true" ]; then
+              echo "The migration run is still using the old signing certificate; update the key secrets before publishing." >&2
+              exit 1
+            fi
+            echo "SIGNATURE_MIGRATION=false" >> "$GITHUB_ENV"
+          fi
+          PREVIOUS_META="$("$AAPT" dump badging "$PREVIOUS_APK" | sed -n "s/^package: name='\([^']*\)' versionCode='\([^']*\)' versionName='\([^']*\)'.*/\1 \2 \3/p" | head -n 1)"
+          CURRENT_META="$("$AAPT" dump badging "$CURRENT_APK" | sed -n "s/^package: name='\([^']*\)' versionCode='\([^']*\)' versionName='\([^']*\)'.*/\1 \2 \3/p" | head -n 1)"
+          read -r previous_package previous_code previous_name <<< "$PREVIOUS_META"
+          read -r current_package current_code current_name <<< "$CURRENT_META"
           if [ -z "$previous_package" ] || [ -z "$current_package" ]; then
             echo "Could not read APK package/version metadata." >&2
             exit 1
@@ -129,17 +195,39 @@ jobs:
             echo "versionCode must increase above the previous published APK." >&2
             exit 1
           fi
-          echo "Verified ${PREVIOUS_TAG} -> ${GITHUB_REF_NAME}: package ${current_package}, version ${current_name} (${current_code}), signer SHA-256 ${CURRENT_CERT}."
+          echo "Verified ${PREVIOUS_TAG} -> ${RELEASE_TAG}: package ${current_package}, version ${current_name} (${current_code}), signer SHA-256 ${CURRENT_CERT}."
       - name: Create GitHub release and attach APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           APK_NAME="EducLib-${APP_VERSION}.apk"
           cp app/build/outputs/apk/release/app-release.apk "$APK_NAME"
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$APK_NAME" --repo "$GITHUB_REPOSITORY" --clobber
+          if [ "$SIGNATURE_MIGRATION" == "true" ]; then
+            cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          ## Importante: migração manual obrigatória para instalações da 16.4.0
+
+          Esta versão usa uma nova chave de assinatura. O Android não permite instalá-la por cima da 16.4.0, e o atualizador dentro do app não pode aplicar essa troca.
+
+          1. Na versão antiga, exporte o backup portátil completo (`.edulib.zip`) e confirme que o arquivo foi salvo fora do app.
+          2. Baixe este APK pela página desta release antes de desinstalar a versão antiga.
+          3. Desinstale o EducLib 16.4.0 e instale o APK 16.5.0 baixado.
+          4. Abra o novo app e restaure o backup ZIP. Guarde o ZIP até conferir os livros, leitores e fotografias.
+
+          Sem exportar o ZIP antes da desinstalação, os dados locais podem ser perdidos. As versões futuras devem ser instaladas normalmente sobre esta 16.5.0.
+          NOTES
+            if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "A release already exists; refusing to overwrite the one-time migration asset." >&2
+              exit 1
+            fi
+            gh release create "$RELEASE_TAG" "$APK_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "EducLib ${APP_VERSION}" \
+              --notes-file "$RUNNER_TEMP/release-notes.md"
+          elif gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$APK_NAME" --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$APK_NAME" \
+            gh release create "$RELEASE_TAG" "$APK_NAME" \
               --repo "$GITHUB_REPOSITORY" \
               --title "EducLib ${APP_VERSION}" \
               --generate-notes

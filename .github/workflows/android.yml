@@ -2,6 +2,8 @@ name: Android CI
 
 on:
   push:
+    branches: [ "main", "design/ipados-tablet-editorial" ]
+  pull_request:
     branches: [ "main" ]
   workflow_dispatch:
 

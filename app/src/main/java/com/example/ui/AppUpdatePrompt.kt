@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit
 private const val UPDATE_PREFERENCES = "app_update_preferences"
 private const val KEY_LAST_CHECKED_AT = "last_checked_at"
 private const val KEY_DISMISSED_TAG = "dismissed_release_tag"
+private const val KEY_DISMISSED_AT = "dismissed_release_at"
 private const val KEY_CACHED_TAG = "cached_release_tag"
 private const val KEY_CACHED_VERSION = "cached_release_version"
 private const val KEY_CACHED_APK_URL = "cached_release_apk_url"
@@ -168,6 +169,10 @@ private object AppUpdateChecker {
                 }
             }
             check(staging.length() > 0L) { "Arquivo APK vazio." }
+            val archive = context.packageManager.getPackageArchiveInfo(staging.absolutePath, 0)
+            check(archive?.packageName == context.packageName) {
+                "O APK não pertence ao EducLib."
+            }
             check(staging.renameTo(destination)) { "Não foi possível finalizar o download." }
             FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", destination)
         } finally {
@@ -226,7 +231,9 @@ fun AppUpdatePrompt() {
 
     LaunchedEffect(Unit) {
         val update = AppUpdateChecker.findUpdate(context, BuildConfig.VERSION_NAME)
-        if (update != null && preferences.getString(KEY_DISMISSED_TAG, null) != update.tagName) {
+        val postponed = update != null && preferences.getString(KEY_DISMISSED_TAG, null) == update.tagName &&
+            System.currentTimeMillis() - preferences.getLong(KEY_DISMISSED_AT, 0L) < TimeUnit.DAYS.toMillis(1)
+        if (update != null && !postponed) {
             availableRelease = update
         }
     }
@@ -234,7 +241,8 @@ fun AppUpdatePrompt() {
     val update = availableRelease ?: return
     val dismissForLater = {
         if (!downloading) {
-            preferences.edit().putString(KEY_DISMISSED_TAG, update.tagName).apply()
+            preferences.edit().putString(KEY_DISMISSED_TAG, update.tagName)
+                .putLong(KEY_DISMISSED_AT, System.currentTimeMillis()).apply()
             availableRelease = null
         }
     }

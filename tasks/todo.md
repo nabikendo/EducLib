@@ -5,8 +5,8 @@
 - [x] Adapt library welcome header for wide tablets without breaking phone layout.
 - [ ] Replace placeholder symbols with consistent vector icons.
 - [x] Implement responsive dark sidebar for tablets (>= 600 dp width).
-- [ ] Implement master/detail split view; currently details still open in a dialog.
-- [ ] Add shared-element transitions between book cards and details.
+- [x] Implement animated master/detail split view for wide landscape tablets; full history remains available in existing dialog.
+- [ ] Add true shared-element transitions between book covers and details (panel slide/fade implemented).
 - [x] Add CI triggers for feature branch and pull requests.
 - [ ] Run Android Gradle compilation, Compose UI tests and tablet screenshots (no successful run observed yet).
 - [ ] Review dark mode, accessibility, reduced motion and keyboard navigation.
@@ -20,3 +20,9 @@ Implementation is isolated on branch `design/ipados-tablet-editorial`; not yet m
 - [ ] Check restore of backup images: portable backup explicitly drops book and borrower photo paths.
 - [ ] Check dialog overflow and screen-reader navigation on landscape tablets.
 - [ ] Confirm Android 36.1 SDK availability in CI environment.
+
+## Update distribution
+
+- [x] In-app APK download from stable GitHub Release, Android installer handoff and next-day retry.
+- [x] Validate APK package name before opening installer.
+- [ ] Verify installer flow on physical tablet, APK signing continuity and stable release secrets.

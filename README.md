@@ -1,6 +1,6 @@
 # EducLib — Biblioteca Escolar
 
-O **EducLib** é um aplicativo Android para organizar o acervo e os empréstimos de uma biblioteca escolar. Foi desenvolvido em Kotlin, Jetpack Compose e Room. Abre sem conta ou senha obrigatória e mantém os registros no aparelho.
+O **EducLib** é um aplicativo Android livre (licença [GPL-3.0](LICENSE)) para organizar o acervo e os empréstimos de uma biblioteca escolar e localizar cada livro nas estantes com um mapa 3D. Foi desenvolvido em Kotlin, Jetpack Compose e Room. Abre sem conta ou senha obrigatória e mantém os registros no aparelho.
 
 ## O que oferece
 
@@ -40,6 +40,14 @@ A exportação de backup é uma ação explícita; o backup automático do Andro
 
 Abra a pasta do repositório no Android Studio, aguarde a sincronização do Gradle e execute em um emulador ou dispositivo. Pela linha de comando, com Gradle instalado, use `gradle assembleDebug`.
 
+Para rodar os testes de unidade (backup, integridade das estantes, geometria do mapa 3D e lembretes):
+
+```bash
+gradle testDebugUnitTest
+```
+
+A varredura com RA só pode ser testada em um aparelho físico compatível com ARCore; emuladores não reproduzem a câmera e a profundidade reais.
+
 ## Releases e atualização pelo app
 
 A versão preparada para publicação é **16.5.0** (`versionCode` 21); a versão pública só muda após a release ser criada e o APK validado. Consulte a página [Releases](https://github.com/nabikendo/EducLib/releases) para identificar o artefato efetivamente publicado.
@@ -71,4 +79,16 @@ O verificador de atualização procura um APK anexado à release mais recente. R
 
 ## Licença e créditos
 
-Este projeto é distribuído sob a licença MIT. Consulte [`LICENSE`](LICENSE). Criado por [@nabikendo](https://github.com/nabikendo).
+O EducLib é software livre, distribuído sob a **GNU General Public License, versão 3 ou posterior** (`GPL-3.0-or-later`). Consulte o texto completo em [`LICENSE`](LICENSE).
+
+Em resumo, e sem substituir o texto da licença:
+
+- você pode usar, estudar, modificar e redistribuir o EducLib, inclusive em outras escolas;
+- quem distribuir o app ou uma versão modificada precisa entregar também o código-fonte correspondente, sob a mesma licença;
+- o programa é fornecido sem garantia.
+
+Versões publicadas até a 16.5.0 foram distribuídas sob a licença MIT, e quem as recebeu continua podendo usá-las nos termos da MIT. A GPL vale para o código a partir desta mudança.
+
+As bibliotecas de terceiros mantêm as próprias licenças. AndroidX, Jetpack Compose, Room, ZXing Android Embedded, Retrofit, OkHttp, Moshi e Coil usam Apache 2.0. O SDK do ARCore e o “Google Play Services para RA” são distribuídos pelo Google sob os próprios termos.
+
+Criado por [@nabikendo](https://github.com/nabikendo).

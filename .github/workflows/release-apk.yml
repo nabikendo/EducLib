@@ -31,9 +31,9 @@ jobs:
         run: |
           if [ -f "./gradlew" ]; then
             chmod +x ./gradlew
-            ./gradlew testDebugUnitTest --tests com.example.data.BackupManagerTest --tests com.example.data.PortableMediaBackupTest --tests com.example.reminders.LoanDueSummaryTest --tests com.example.map.LibraryMapMathTest --tests com.example.data.ShelfIntegrityTest --tests com.example.data.LoanRulesTest --stacktrace
+            ./gradlew testDebugUnitTest --tests com.example.data.BackupManagerTest --tests com.example.data.PortableMediaBackupTest --tests com.example.reminders.LoanDueSummaryTest --tests com.example.map.LibraryMapMathTest --tests com.example.data.ShelfIntegrityTest --tests com.example.data.LoanRulesTest --tests com.example.data.ShelfLayoutTest --stacktrace
           else
-            gradle testDebugUnitTest --tests com.example.data.BackupManagerTest --tests com.example.data.PortableMediaBackupTest --tests com.example.reminders.LoanDueSummaryTest --tests com.example.map.LibraryMapMathTest --tests com.example.data.ShelfIntegrityTest --tests com.example.data.LoanRulesTest --stacktrace
+            gradle testDebugUnitTest --tests com.example.data.BackupManagerTest --tests com.example.data.PortableMediaBackupTest --tests com.example.reminders.LoanDueSummaryTest --tests com.example.map.LibraryMapMathTest --tests com.example.data.ShelfIntegrityTest --tests com.example.data.LoanRulesTest --tests com.example.data.ShelfLayoutTest --stacktrace
           fi
       - name: Resolve previous stable release APK
         env:

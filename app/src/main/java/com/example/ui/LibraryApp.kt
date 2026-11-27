@@ -10546,6 +10546,11 @@ fun RoofModuleView(
                         Button(
                             onClick = {
                                 if (finalCoordinate.isNotBlank()) {
+                                    // Amplia a grade da estante para a célula aparecer certa no mapa 3D.
+                                    levelNumber?.let { level ->
+                                        val grown = currentShelf.expandedToFit(level, columnNumber)
+                                        if (grown != currentShelf) viewModel.updateShelfLayout(grown)
+                                    }
                                     viewModel.addPosition(currentShelf.id, finalCoordinate, accessLvl)
                                     showPositionAddDialog = false
                                     Toast.makeText(context, "Posição ativada!", Toast.LENGTH_SHORT).show()

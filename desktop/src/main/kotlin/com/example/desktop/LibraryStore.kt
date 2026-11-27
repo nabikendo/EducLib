@@ -258,6 +258,7 @@ class LibraryStore(
 
     fun saveShelf(shelf: ShelfEntity): Int {
         if (shelf.name.isBlank()) throw StoreException("Informe o nome da estante.")
+        if (!shelf.hasValidLayout()) throw StoreException("Medidas inválidas: use números finitos, medidas até ${ShelfEntity.MAX_DIMENSION_M.toInt()} m, 1 a ${ShelfEntity.MAX_LEVELS} prateleiras e 1 a ${ShelfEntity.MAX_COLUMNS} colunas.")
         var savedId = shelf.id
         commit { d ->
             if (shelf.id == 0) {

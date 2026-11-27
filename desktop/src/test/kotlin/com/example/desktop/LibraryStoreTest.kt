@@ -131,6 +131,15 @@ class LibraryStoreTest {
     }
 
     @Test
+    fun nonFiniteShelfMeasurementIsRefusedSoExportKeepsWorking() {
+        val s = store()
+        val id = s.saveShelf(ShelfEntity(name = "A"))
+        assertFailsWith<StoreException> { s.saveShelf(s.data.value.shelves.single().copy(rotationDeg = Double.POSITIVE_INFINITY)) }
+        assertEquals(0.0, s.data.value.shelves.single { it.id == id }.rotationDeg)
+        assertNotNull(BackupFormat.fromJson(s.exportJson()))
+    }
+
+    @Test
     fun corruptDataFileIsReportedNotSilentlyReset() {
         Files.writeString(dir.resolve("biblioteca.json"), "{ isto não é json")
         val error = assertFailsWith<StoreException> { store() }

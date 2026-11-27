@@ -148,15 +148,4 @@ object BackupFormat {
         }
         return null
     }
-
-    private fun ShelfEntity.hasValidLayout(): Boolean {
-        fun Double.inRange(min: Double, max: Double) = !isNaN() && this > min && this <= max
-        val coordsOk = listOfNotNull(mapX, mapZ).all { !it.isNaN() && kotlin.math.abs(it) <= 1_000.0 }
-        return coordsOk && !rotationDeg.isNaN() &&
-            widthM.inRange(0.0, ShelfEntity.MAX_DIMENSION_M) &&
-            depthM.inRange(0.0, ShelfEntity.MAX_DIMENSION_M) &&
-            heightM.inRange(0.0, ShelfEntity.MAX_DIMENSION_M) &&
-            levelCount in 1..ShelfEntity.MAX_LEVELS &&
-            columnCount in 1..ShelfEntity.MAX_COLUMNS
-    }
 }

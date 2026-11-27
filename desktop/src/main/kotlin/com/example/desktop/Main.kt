@@ -626,6 +626,8 @@ private fun ShelvesScreen(data: LibraryData, store: LibraryStore, act: Act, onOp
                         OutlinedButton(enabled = level.toIntOrNull() != null, onClick = {
                             val l = level.toInt(); val c = column.toIntOrNull()
                             act("Posição criada.") {
+                                // Amplia a grade da estante para a célula aparecer certa no mapa 3D.
+                                shelf.expandedToFit(l, c).let { grown -> if (grown != shelf) store.saveShelf(grown) }
                                 store.addPosition(shelf.id, formatCellCoordinate(l, c, maxOf(shelf.columnCount, c ?: 1)), accessibilityLevel = 2)
                                 level = ""; column = ""
                             }

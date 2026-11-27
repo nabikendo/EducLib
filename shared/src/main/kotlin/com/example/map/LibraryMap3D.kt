@@ -584,7 +584,8 @@ fun ShelfLayoutEditorDialog(
     var columns by remember { mutableStateOf(shelf.columnCount.toString()) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    fun num(s: String) = s.trim().replace(',', '.').toDoubleOrNull()
+    // Só números finitos: "Infinity", "NaN" ou "1e309" passariam pelo toDoubleOrNull e impediriam o backup (o JSON não os representa).
+    fun num(s: String) = s.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -640,7 +641,7 @@ fun ShelfLayoutEditorDialog(
                 if (error == null) {
                     onSave(
                         shelf.copy(
-                            mapX = vx, mapZ = vz, rotationDeg = vr!!, widthM = vw!!, depthM = vd!!, heightM = vh!!,
+                            mapX = vx, mapZ = vz, rotationDeg = vr!! % 360.0, widthM = vw!!, depthM = vd!!, heightM = vh!!,
                             levelCount = vl!!, columnCount = vc!!, layoutSource = "manual"
                         )
                     )

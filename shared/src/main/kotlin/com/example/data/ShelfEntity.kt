@@ -30,6 +30,28 @@ data class ShelfEntity(
     /** Origem das medidas: "" (padrão), "manual" ou "ar". */
     val layoutSource: String = ""
 ) {
+    /**
+     * Garante que a grade da estante comporte a célula informada. Sem isso, "Coluna 2" numa estante de
+     * 1 coluna era descartada pelo mapa e o destaque cobria a prateleira inteira.
+     */
+    fun expandedToFit(level: Int, column: Int?): ShelfEntity {
+        val levels = maxOf(levelCount, level).coerceAtMost(MAX_LEVELS)
+        val columns = maxOf(columnCount, column ?: 1).coerceAtMost(MAX_COLUMNS)
+        return if (levels == levelCount && columns == columnCount) this else copy(levelCount = levels, columnCount = columns)
+    }
+
+    /** Medidas que o mapa consegue desenhar e o backup JSON consegue gravar (sem NaN/infinito). */
+    fun hasValidLayout(): Boolean {
+        fun Double.inRange(min: Double, max: Double) = isFinite() && this > min && this <= max
+        val coordsOk = listOfNotNull(mapX, mapZ).all { it.isFinite() && kotlin.math.abs(it) <= 1_000.0 }
+        return coordsOk && rotationDeg.isFinite() &&
+            widthM.inRange(0.0, MAX_DIMENSION_M) &&
+            depthM.inRange(0.0, MAX_DIMENSION_M) &&
+            heightM.inRange(0.0, MAX_DIMENSION_M) &&
+            levelCount in 1..MAX_LEVELS &&
+            columnCount in 1..MAX_COLUMNS
+    }
+
     companion object {
         const val DEFAULT_WIDTH_M = 1.0
         const val DEFAULT_DEPTH_M = 0.35

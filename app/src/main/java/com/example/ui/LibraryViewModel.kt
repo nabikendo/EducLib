@@ -803,6 +803,7 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
 
     /** Salva posição/medidas da estante na planta (mapa 3D). */
     fun updateShelfLayout(shelf: ShelfEntity) {
+        if (!shelf.hasValidLayout()) return // o editor já recusa; nunca gravar algo que quebraria o backup
         viewModelScope.launch {
             repository.updateShelf(shelf)
         }

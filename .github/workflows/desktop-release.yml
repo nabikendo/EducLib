@@ -49,6 +49,13 @@ jobs:
               echo "Release $TAG already exists; bump version in desktop/build.gradle.kts first." >&2
               exit 1
             fi
+            # `gh release create --target` não move uma tag existente: se ela já aponta para outro
+            # commit, os instaladores (feitos deste commit) sairiam sob o código-fonte de outro.
+            git fetch --tags --quiet origin
+            if EXISTING="$(git rev-parse -q --verify "refs/tags/$TAG^{commit}")" && [ "$EXISTING" != "$GITHUB_SHA" ]; then
+              echo "Tag $TAG already points to $EXISTING, not $GITHUB_SHA. Delete it or bump the version." >&2
+              exit 1
+            fi
           else
             TAG="$GITHUB_REF_NAME"
             if [ "${TAG#desktop-v}" != "$BUILD_VERSION" ]; then

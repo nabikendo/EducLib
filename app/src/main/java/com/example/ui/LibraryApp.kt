@@ -6876,10 +6876,9 @@ fun BookDetailsDialog(
                             AlertDialogHelper.showConfirmDialog(
                                 context = context,
                                 title = "Excluir Livro",
-                                message = "Deseja realmente excluir \"${book.title}\"? Isso removerá as referências de estoque local.",
+                                message = "Deseja realmente excluir \"${book.title}\"? O histórico de empréstimos devolvidos é mantido e as reservas deste livro são removidas. Livros com exemplares emprestados não podem ser excluídos.",
                                 onConfirm = {
-                                    viewModel.deleteBook(context, book)
-                                    onDismiss()
+                                    viewModel.deleteBook(context, book, onDeleted = onDismiss)
                                 }
                             )
                         }) {
@@ -7349,6 +7348,7 @@ fun BookDetailsDialog(
             books = mapBooks,
             initialBookId = book.id,
             onSaveShelf = { viewModel.updateShelfLayout(it) },
+            onScanRequest = { context.startActivity(Intent(context, LibraryScanActivity::class.java)) },
             onDismiss = { showBookMap = false }
         )
     }
@@ -10427,6 +10427,7 @@ fun RoofModuleView(
             positions = positions,
             books = books,
             onSaveShelf = { viewModel.updateShelfLayout(it) },
+            onScanRequest = { context.startActivity(Intent(context, LibraryScanActivity::class.java)) },
             onDismiss = { showMap3D = false }
         )
     }

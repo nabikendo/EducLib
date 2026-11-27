@@ -110,6 +110,24 @@ class ShelfIntegrityTest {
     }
 
     @Test
+    fun deletingABookKeepsReturnedHistoryDropsReservationsAndKeepsBackupRestorable() = runBlocking {
+        database.bookDao().insertBook(book(1, positionId = null))
+        database.bookDao().insertBook(book(2, positionId = null))
+        database.loanDao().insertLoan(LoanEntity(id = 1, bookId = 1, bookTitle = "Livro 1", bookAuthor = "Autoria", borrowerName = "Ana", borrowerClass = "Aluno - 7º A", loanDate = 0, dueDate = 1, returnDate = 2))
+        database.loanDao().insertLoan(LoanEntity(id = 2, bookId = 2, bookTitle = "Livro 2", bookAuthor = "Autoria", borrowerName = "Ana", borrowerClass = "Aluno - 7º A", loanDate = 0, dueDate = 1))
+        database.reservationDao().insertReservation(ReservationEntity(id = 1, bookId = 1, bookTitle = "Livro 1", borrowerName = "Bia", borrowerClass = "8º B"))
+
+        assertNull(repository.deleteBook(book(1, positionId = null)))
+        assertNotNull("livro emprestado não pode ser excluído", repository.deleteBook(book(2, positionId = null)))
+
+        assertEquals(listOf(2), database.bookDao().getAllBooksSnapshot().map { it.id })
+        assertEquals(2, database.loanDao().getAllLoansSnapshot().size)
+        assertTrue(database.reservationDao().getAllReservationsSnapshot().isEmpty())
+        val json = BackupManager.toJson(repository.createBackupSnapshot())
+        assertNull(BackupManager.validate(BackupManager.fromJson(json)!!))
+    }
+
+    @Test
     fun rejectsShelvesWithImpossibleMeasurements() {
         val payload = BackupPayload(
             formatVersion = BackupManager.CURRENT_FORMAT_VERSION,

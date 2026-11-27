@@ -1,6 +1,5 @@
 package com.example.map
 
-import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -62,7 +61,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.ExperimentalTextApi
@@ -78,7 +76,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.ar.LibraryScanActivity
 import com.example.data.BookEntity
 import com.example.data.ShelfEntity
 import com.example.data.ShelfPositionEntity
@@ -127,9 +124,10 @@ fun LibraryMap3DDialog(
     books: List<BookEntity>,
     initialBookId: Int? = null,
     onSaveShelf: (ShelfEntity) -> Unit,
+    /** Abre a varredura com RA; nulo onde não há RA (desktop). */
+    onScanRequest: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
     val boxes = remember(shelves) { layoutShelves(shelves) }
     val positionsById = remember(positions) { positions.associateBy { it.id } }
     val shelvesById = remember(shelves) { shelves.associateBy { it.id } }
@@ -196,8 +194,10 @@ fun LibraryMap3DDialog(
                     IconButton(onClick = { camera = fitCamera(boxes, camera.yawDeg, camera.pitchDeg) }) {
                         Icon(Icons.Outlined.CenterFocusStrong, contentDescription = "Centralizar mapa")
                     }
-                    IconButton(onClick = { context.startActivity(Intent(context, LibraryScanActivity::class.java)) }) {
-                        Icon(Icons.Outlined.ViewInAr, contentDescription = "Escanear a biblioteca com realidade aumentada")
+                    if (onScanRequest != null) {
+                        IconButton(onClick = onScanRequest) {
+                            Icon(Icons.Outlined.ViewInAr, contentDescription = "Escanear a biblioteca com realidade aumentada")
+                        }
                     }
                 }
 
@@ -315,7 +315,8 @@ fun LibraryMap3DDialog(
                     shelfBooks = selectedShelfId?.let { id -> locations.filter { it.second.shelfId == id } }.orEmpty(),
                     shelvesById = shelvesById,
                     onPickBook = { selectedBookId = it.id },
-                    onEditShelf = { editingShelf = it }
+                    onEditShelf = { editingShelf = it },
+                    canScan = onScanRequest != null
                 )
             }
         }
@@ -343,7 +344,8 @@ private fun MapInfoPanel(
     shelfBooks: List<Pair<BookEntity, BookLocation>>,
     shelvesById: Map<Int, ShelfEntity>,
     onPickBook: (BookEntity) -> Unit,
-    onEditShelf: (ShelfEntity) -> Unit
+    onEditShelf: (ShelfEntity) -> Unit,
+    canScan: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(12.dp).heightIn(max = 220.dp),
@@ -412,7 +414,7 @@ private fun MapInfoPanel(
                 }
                 else -> Text(
                     "Arraste para girar, use pinça para aproximar e toque numa estante para ver seus livros. " +
-                        "Use o botão de AR para medir as estantes com a câmera.",
+                        (if (canScan) "Use o botão de RA para medir as estantes com a câmera." else "Toque numa estante e use Medidas para posicioná-la na planta."),
                     fontSize = 12.sp,
                     color = LibraryMuted
                 )

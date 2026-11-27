@@ -55,6 +55,11 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  // Código sem dependência de Android, compartilhado com o app de desktop (pasta desktop/).
+  sourceSets {
+    getByName("main") { kotlin.srcDir("../shared/src/main/kotlin") }
+    getByName("test") { kotlin.srcDir("../shared/src/test/kotlin") }
+  }
 }
 
 // Some unused dependencies are commented out below instead of being removed.

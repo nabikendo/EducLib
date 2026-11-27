@@ -30,7 +30,7 @@ Lembretes e widget são opcionais. O EducLib continua útil sem rede, sem notifi
 
 A pasta [`desktop/`](desktop) contém o EducLib para computador, com acervo, leitores, empréstimos e devoluções (com as mesmas regras de prazo, devolução parcial e bloqueio por atraso do Android), estantes e o mesmo mapa 3D. A medição com realidade aumentada continua só no Android; no computador, as medidas das estantes são digitadas em *Mapa 3D → Medidas*.
 
-**Instalação:** baixe os instaladores gerados pelo workflow *Desktop (Windows e Linux)* em Actions (artefatos `EducLib-windows` e `EducLib-linux-deb`).
+**Instalação:** baixe os instaladores na release **EducLib Desktop** da página [Releases](https://github.com/nabikendo/EducLib/releases).
 
 - **Windows:** execute o `.msi` (ou o `.exe`). A instalação é só para o usuário atual e não pede senha de administrador.
 - **Zorin OS / Ubuntu / Debian:** abra o `.deb` com o instalador de programas ou rode `sudo apt install ./educlib_1.0.0_amd64.deb`. O EducLib aparece no menu, em *Educação*.
@@ -49,7 +49,7 @@ gradle run
 gradle test
 ```
 
-`gradle packageDeb` gera o `.deb` no Linux; `gradle packageMsi packageExe` gera os instaladores no Windows. O código sem dependência de Android (entidades, formato de backup, regras de empréstimo, busca e mapa 3D) fica em [`shared/`](shared) e é compilado pelos dois apps.
+`gradle packageDeb` gera o `.deb` no Linux; `gradle packageMsi packageExe` gera os instaladores no Windows. Para publicar, atualize `version` em `desktop/build.gradle.kts` e envie para a `main` uma tag `desktop-vX.Y.Z` igual à versão: o workflow *Release Desktop* gera os instaladores no Windows e no Ubuntu 22.04 e cria a release, sem marcá-la como a mais recente, para não interferir na atualização do app Android. O código sem dependência de Android (entidades, formato de backup, regras de empréstimo, busca e mapa 3D) fica em [`shared/`](shared) e é compilado pelos dois apps.
 
 ## Privacidade e backup
 

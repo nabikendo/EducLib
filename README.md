@@ -1,6 +1,6 @@
 # EducLib — Biblioteca Escolar
 
-O **EducLib** é um aplicativo Android livre (licença [GPL-3.0](LICENSE)) para organizar o acervo e os empréstimos de uma biblioteca escolar e localizar cada livro nas estantes com um mapa 3D. Foi desenvolvido em Kotlin, Jetpack Compose e Room. Abre sem conta ou senha obrigatória e mantém os registros no aparelho.
+O **EducLib** é um aplicativo livre (licença [GPL-3.0](LICENSE)) para organizar o acervo e os empréstimos de uma biblioteca escolar e localizar cada livro nas estantes com um mapa 3D. Existe para **Android** e para **computadores com Windows ou Linux** (inclusive Zorin OS). Foi desenvolvido em Kotlin, Jetpack Compose/Compose Multiplatform e Room. Abre sem conta ou senha obrigatória e mantém os registros no próprio aparelho.
 
 ## O que oferece
 
@@ -25,6 +25,31 @@ O **EducLib** é um aplicativo Android livre (licença [GPL-3.0](LICENSE)) para 
 O S24 FE não tem sensor LiDAR/ToF. A profundidade vem do movimento da câmera, então a precisão costuma ficar em alguns centímetros com boa iluminação. Por isso o app mede estantes em vez de gerar uma malha 3D bruta da sala. A câmera é usada apenas no aparelho: nenhuma imagem é gravada ou enviada.
 
 Lembretes e widget são opcionais. O EducLib continua útil sem rede, sem notificações e sem criar conta.
+
+## Versão para computador (Windows e Linux)
+
+A pasta [`desktop/`](desktop) contém o EducLib para computador, com acervo, leitores, empréstimos e devoluções (com as mesmas regras de prazo, devolução parcial e bloqueio por atraso do Android), estantes e o mesmo mapa 3D. A medição com realidade aumentada continua só no Android; no computador, as medidas das estantes são digitadas em *Mapa 3D → Medidas*.
+
+**Instalação:** baixe os instaladores gerados pelo workflow *Desktop (Windows e Linux)* em Actions (artefatos `EducLib-windows` e `EducLib-linux-deb`).
+
+- **Windows:** execute o `.msi` (ou o `.exe`). A instalação é só para o usuário atual e não pede senha de administrador.
+- **Zorin OS / Ubuntu / Debian:** abra o `.deb` com o instalador de programas ou rode `sudo apt install ./educlib_1.0.0_amd64.deb`. O EducLib aparece no menu, em *Educação*.
+
+Os instaladores trazem o próprio Java, então não é preciso instalar mais nada.
+
+**Dados:** cada computador guarda a biblioteca em `%APPDATA%\EducLib` (Windows) ou `~/.local/share/educlib` (Linux), no arquivo `biblioteca.json`. Esse arquivo é um backup EducLib v2 válido, e a versão anterior fica em `biblioteca.json.bak`. Não há sincronização automática: para levar os dados do celular ao computador, exporte o backup JSON no Android e use *Backup → Importar backup* no computador; para o caminho inverso, use *Exportar backup* e restaure no celular. A importação substitui todos os dados do destino. Fotos de capas e leitores não vão pelo JSON.
+
+**Desenvolvimento:** com JDK 17+ e Gradle 9, dentro de `desktop/`:
+
+```bash
+gradle run
+```
+
+```bash
+gradle test
+```
+
+`gradle packageDeb` gera o `.deb` no Linux; `gradle packageMsi packageExe` gera os instaladores no Windows. O código sem dependência de Android (entidades, formato de backup, regras de empréstimo, busca e mapa 3D) fica em [`shared/`](shared) e é compilado pelos dois apps.
 
 ## Privacidade e backup
 

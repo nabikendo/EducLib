@@ -29,12 +29,15 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.ViewInAr
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -59,7 +62,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -111,7 +116,7 @@ fun describeCell(cell: CellCoordinate): String = listOfNotNull(
     cell.column?.let { "Coluna $it" }
 ).joinToString(" · ").ifEmpty { "posição sem prateleira numerada" }
 
-private fun Double.fmt(decimals: Int = 2) = String.format(Locale("pt", "BR"), "%.${decimals}f", this)
+private fun Double.fmt(decimals: Int = 2) = String.format(Locale.forLanguageTag("pt-BR"), "%.${decimals}f", this)
 
 /**
  * Mapa 3D da biblioteca em tela cheia: estantes, células ocupadas e o livro procurado em destaque.
@@ -263,11 +268,13 @@ fun LibraryMap3DDialog(
                         .weight(1f)
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
-                        .background(Color.White, RoundedCornerShape(16.dp))
+                        // Sem o recorte, o piso e as estantes eram desenhados por cima do painel de informações.
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
                 ) {
                     if (boxes.isEmpty()) {
                         Text(
-                            "Cadastre estantes na aba ROOF para montar o mapa.",
+                            "Cadastre estantes para montar o mapa.",
                             color = LibraryMuted,
                             modifier = Modifier.align(Alignment.Center).padding(24.dp)
                         )
@@ -284,6 +291,20 @@ fun LibraryMap3DDialog(
                                             pitchDeg = (camera.pitchDeg + pan.y * 0.3).coerceIn(8.0, 89.0),
                                             distance = (camera.distance / zoom).coerceIn(1.0, 300.0)
                                         )
+                                    }
+                                }
+                                .pointerInput(Unit) {
+                                    // Roda do mouse/touchpad: aproxima e afasta (a pinça não existe com mouse).
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            if (event.type != PointerEventType.Scroll) continue
+                                            val dy = event.changes.sumOf { it.scrollDelta.y.toDouble() }
+                                            if (dy != 0.0) {
+                                                camera = camera.copy(distance = (camera.distance * (1 + 0.12 * dy)).coerceIn(1.0, 300.0))
+                                                event.changes.forEach { it.consume() }
+                                            }
+                                        }
                                     }
                                 }
                                 .pointerInput(boxes) {
@@ -303,6 +324,17 @@ fun LibraryMap3DDialog(
                                 selectedShelfId = selectedShelfId,
                                 textMeasurer = textMeasurer
                             )
+                        }
+                        Column(
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            FilledTonalIconButton(onClick = { camera = camera.copy(distance = (camera.distance / 1.25).coerceIn(1.0, 300.0)) }) {
+                                Icon(Icons.Outlined.Add, contentDescription = "Aproximar")
+                            }
+                            FilledTonalIconButton(onClick = { camera = camera.copy(distance = (camera.distance * 1.25).coerceIn(1.0, 300.0)) }) {
+                                Icon(Icons.Outlined.Remove, contentDescription = "Afastar")
+                            }
                         }
                     }
                 }
@@ -413,8 +445,9 @@ private fun MapInfoPanel(
                     }
                 }
                 else -> Text(
-                    "Arraste para girar, use pinça para aproximar e toque numa estante para ver seus livros. " +
-                        (if (canScan) "Use o botão de RA para medir as estantes com a câmera." else "Toque numa estante e use Medidas para posicioná-la na planta."),
+                    "Arraste para girar e aproxime com pinça, roda do mouse ou os botões + e −. " +
+                        "Toque numa estante para ver seus livros e use Medidas para posicioná-la na planta." +
+                        (if (canScan) " O botão de RA mede as estantes com a câmera." else ""),
                     fontSize = 12.sp,
                     color = LibraryMuted
                 )

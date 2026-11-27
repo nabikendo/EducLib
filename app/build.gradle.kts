@@ -66,6 +66,8 @@ dependencies {
   implementation(libs.androidx.biometric)
   implementation(libs.androidx.appcompat)
   implementation(libs.journeyapps.zxing)
+  // ARCore opcional: só a varredura 3D da biblioteca usa; o app instala em aparelhos sem RA.
+  implementation(libs.google.ar.core)
   // implementation(libs.androidx.camera.camera2)
   // implementation(libs.androidx.camera.core)
   // implementation(libs.androidx.camera.lifecycle)

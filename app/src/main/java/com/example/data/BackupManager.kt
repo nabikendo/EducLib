@@ -149,14 +149,24 @@ object BackupManager {
             if (positions.map { it.id }.distinct().size != positions.size) return "O backup contém IDs de posições repetidos."
             if (suggestions.map { it.id }.distinct().size != suggestions.size) return "O backup contém IDs de sugestões repetidos."
             val shelfIds = shelves.map { it.id }.toSet()
-            val positionIds = positions.map { it.id }.toSet()
             if (positions.any { it.shelfId !in shelfIds }) return "Há uma posição sem estante correspondente no arquivo."
             if (reservations.any { it.bookId !in bookIds }) return "Há uma reserva sem livro correspondente no arquivo."
-            if (books.any { it.posicaoEstanteId != null && it.posicaoEstanteId !in positionIds }) {
-                return "Há um livro vinculado a uma posição de estante que não está no arquivo."
-            }
+            // `books.posicaoEstanteId` não é FK: versões anteriores deixavam vínculos órfãos ao apagar
+            // uma estante. A restauração descarta esses vínculos em vez de recusar o backup inteiro.
+            if (shelves.any { !it.hasValidLayout() }) return "Há uma estante com medidas inválidas no arquivo."
         }
         return null
+    }
+
+    private fun ShelfEntity.hasValidLayout(): Boolean {
+        fun Double.inRange(min: Double, max: Double) = !isNaN() && this > min && this <= max
+        val coordsOk = listOfNotNull(mapX, mapZ).all { !it.isNaN() && kotlin.math.abs(it) <= 1_000.0 }
+        return coordsOk && !rotationDeg.isNaN() &&
+            widthM.inRange(0.0, ShelfEntity.MAX_DIMENSION_M) &&
+            depthM.inRange(0.0, ShelfEntity.MAX_DIMENSION_M) &&
+            heightM.inRange(0.0, ShelfEntity.MAX_DIMENSION_M) &&
+            levelCount in 1..ShelfEntity.MAX_LEVELS &&
+            columnCount in 1..ShelfEntity.MAX_COLUMNS
     }
 
     fun saveAutoBackup(context: Context, snapshot: BackupSnapshot) {

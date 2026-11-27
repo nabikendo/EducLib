@@ -856,6 +856,13 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
         }
     }
 
+    /** Salva posição/medidas da estante na planta (mapa 3D). */
+    fun updateShelfLayout(shelf: ShelfEntity) {
+        viewModelScope.launch {
+            repository.updateShelf(shelf)
+        }
+    }
+
     fun deleteShelf(shelf: ShelfEntity) {
         viewModelScope.launch {
             repository.deleteShelf(shelf)

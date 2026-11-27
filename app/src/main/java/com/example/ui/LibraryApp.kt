@@ -75,6 +75,9 @@ import com.example.data.BorrowerEntity
 import com.example.data.ReservationEntity
 import com.example.data.ShelfEntity
 import com.example.data.ShelfPositionEntity
+import com.example.ar.LibraryScanActivity
+import com.example.map.LibraryMap3DDialog
+import com.example.map.formatCellCoordinate
 import com.example.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -6791,6 +6794,7 @@ fun BookDetailsDialog(
     var showPartialReturnDialog by remember { mutableStateOf<LoanEntity?>(null) }
     var showReserveDialog by remember { mutableStateOf(false) }
     var showFichaEtiqueta by remember { mutableStateOf(false) }
+    var showBookMap by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -6861,6 +6865,9 @@ fun BookDetailsDialog(
                         }
                         IconButton(onClick = { showFichaEtiqueta = true }) {
                             Icon(Icons.Outlined.QrCode, contentDescription = "Ficha e Etiquetas", tint = ThemePurplePrimary)
+                        }
+                        IconButton(onClick = { showBookMap = true }) {
+                            Icon(Icons.Outlined.ViewInAr, contentDescription = "Ver no mapa 3D", tint = ThemePurplePrimary)
                         }
                         IconButton(onClick = onEdit) {
                             Icon(Icons.Outlined.Edit, contentDescription = "Editar", tint = ThemeSecondaryText)
@@ -7329,6 +7336,20 @@ fun BookDetailsDialog(
         FichaEtiquetaDialog(
             book = book,
             onDismiss = { showFichaEtiqueta = false }
+        )
+    }
+
+    if (showBookMap) {
+        val mapBooks by viewModel.books.collectAsStateWithLifecycle()
+        val mapShelves by viewModel.shelves.collectAsStateWithLifecycle()
+        val mapPositions by viewModel.positions.collectAsStateWithLifecycle()
+        LibraryMap3DDialog(
+            shelves = mapShelves,
+            positions = mapPositions,
+            books = mapBooks,
+            initialBookId = book.id,
+            onSaveShelf = { viewModel.updateShelfLayout(it) },
+            onDismiss = { showBookMap = false }
         )
     }
 }
@@ -10063,6 +10084,8 @@ fun RoofModuleView(
     var showPositionAddDialog by remember { mutableStateOf(false) }
     var showOptimizeDialog by remember { mutableStateOf(false) }
     var associateBookTargetPosition by remember { mutableStateOf<ShelfPositionEntity?>(null) }
+    var showMap3D by remember { mutableStateOf(false) }
+    var shelfPendingDelete by remember { mutableStateOf<ShelfEntity?>(null) }
     
     // Auto selector initial shelf
     LaunchedEffect(shelves) {
@@ -10112,6 +10135,31 @@ fun RoofModuleView(
                     onClick = { showShelfAddDialog = true },
                     label = { Text("+ Criar Estante", fontSize = 10.sp, color = ThemePurplePrimary) }
                 )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { showMap3D = true },
+                    enabled = shelves.isNotEmpty(),
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Outlined.ViewInAr, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Mapa 3D", fontSize = 12.sp)
+                }
+                OutlinedButton(
+                    onClick = { context.startActivity(Intent(context, LibraryScanActivity::class.java)) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Outlined.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Escanear (RA)", fontSize = 12.sp)
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -10203,11 +10251,7 @@ fun RoofModuleView(
             
             // Delete shelf icon
             IconButton(
-                onClick = {
-                    viewModel.deleteShelf(currentShelf)
-                    selectedShelfId = null
-                    Toast.makeText(context, "Estante física deletada!", Toast.LENGTH_SHORT).show()
-                }
+                onClick = { shelfPendingDelete = currentShelf }
             ) {
                 Icon(Icons.Outlined.DeleteForever, contentDescription = "Deletar Estante", tint = StatusOverdueRedText)
             }
@@ -10377,10 +10421,54 @@ fun RoofModuleView(
         }
     }
 
+    if (showMap3D) {
+        LibraryMap3DDialog(
+            shelves = shelves,
+            positions = positions,
+            books = books,
+            onSaveShelf = { viewModel.updateShelfLayout(it) },
+            onDismiss = { showMap3D = false }
+        )
+    }
+
+    shelfPendingDelete?.let { shelf ->
+        val shelfPositionIds = positions.filter { it.shelfId == shelf.id }.map { it.id }.toSet()
+        val affectedBooks = books.count { it.posicaoEstanteId in shelfPositionIds }
+        AlertDialog(
+            onDismissRequest = { shelfPendingDelete = null },
+            title = { Text("Excluir “${shelf.name}”?") },
+            text = {
+                Text(
+                    "Serão removidas ${shelfPositionIds.size} posições desta estante. " +
+                        (if (affectedBooks > 0) "$affectedBooks livros ficarão sem posição (o cadastro dos livros é mantido). " else "") +
+                        "Esta ação não pode ser desfeita."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteShelf(shelf)
+                    if (selectedShelfId == shelf.id) selectedShelfId = null
+                    shelfPendingDelete = null
+                    Toast.makeText(context, "Estante excluída.", Toast.LENGTH_SHORT).show()
+                }) { Text("Excluir", color = StatusOverdueRedText) }
+            },
+            dismissButton = { TextButton(onClick = { shelfPendingDelete = null }) { Text("Cancelar") } }
+        )
+    }
+
     // Modal adding cell position
     if (showPositionAddDialog && currentShelf != null) {
         var coordName by remember { mutableStateOf("") }
         var accessLvl by remember { mutableStateOf(3) }
+        var levelText by remember { mutableStateOf("") }
+        var columnText by remember { mutableStateOf("") }
+        val levelNumber = levelText.trim().toIntOrNull()?.takeIf { it in 1..ShelfEntity.MAX_LEVELS }
+        val columnNumber = columnText.trim().toIntOrNull()?.takeIf { it in 1..ShelfEntity.MAX_COLUMNS }
+        val structuredCoordinate = levelNumber?.let { level ->
+            formatCellCoordinate(level, columnNumber, maxOf(currentShelf.columnCount, columnNumber ?: 1)) +
+                (coordName.trim().takeIf { it.isNotEmpty() }?.let { " — $it" } ?: "")
+        }
+        val finalCoordinate = structuredCoordinate ?: coordName.trim()
         
         Dialog(onDismissRequest = { showPositionAddDialog = false }) {
             Card(
@@ -10394,13 +10482,42 @@ fun RoofModuleView(
                     Text("Vincular célula à estante ${currentShelf.name}", style = MaterialTheme.typography.bodySmall, color = ThemeSecondaryText)
                     Spacer(modifier = Modifier.height(10.dp))
                     
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = levelText,
+                            onValueChange = { levelText = it.filter(Char::isDigit).take(2) },
+                            label = { Text("Prateleira nº") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ThemePurplePrimary)
+                        )
+                        OutlinedTextField(
+                            value = columnText,
+                            onValueChange = { columnText = it.filter(Char::isDigit).take(2) },
+                            label = { Text("Coluna nº") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ThemePurplePrimary)
+                        )
+                    }
+                    Text(
+                        "Prateleira 1 é a de baixo; coluna 1 é a da esquerda, olhando de frente. Usado para mostrar o livro no mapa 3D.",
+                        fontSize = 11.sp,
+                        color = ThemeSecondaryText
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = coordName,
                         onValueChange = { coordName = it },
-                        label = { Text("Posição (ex: Prateleira 2)") },
+                        label = { Text(if (levelNumber != null) "Observação (opcional)" else "Posição (ex: Prateleira 2)") },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ThemePurplePrimary)
                     )
+                    if (finalCoordinate.isNotBlank()) {
+                        Text("Será salva como: $finalCoordinate", fontSize = 11.sp, color = ThemeSecondaryText)
+                    }
                     
                     Spacer(modifier = Modifier.height(10.dp))
                     Text("Nível de Acessibilidade Física:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
@@ -10427,8 +10544,8 @@ fun RoofModuleView(
                         }
                         Button(
                             onClick = {
-                                if (coordName.isNotBlank()) {
-                                    viewModel.addPosition(currentShelf.id, coordName, accessLvl)
+                                if (finalCoordinate.isNotBlank()) {
+                                    viewModel.addPosition(currentShelf.id, finalCoordinate, accessLvl)
                                     showPositionAddDialog = false
                                     Toast.makeText(context, "Posição ativada!", Toast.LENGTH_SHORT).show()
                                 }

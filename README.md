@@ -12,6 +12,17 @@ O **EducLib** é um aplicativo Android para organizar o acervo e os empréstimos
 - Widget de tela inicial com contagens de devoluções atrasadas e próximas.
 - Interface em português brasileiro, com navegação lateral para tablets, Split View no acervo e transição compartilhada de capas; respeita o tamanho de fonte do sistema.
 - Verificação de novas releases públicas do GitHub; a instalação sempre depende da confirmação do Android.
+- **Mapa 3D da biblioteca:** mostra as estantes na planta, as prateleiras ocupadas e, ao buscar um livro, destaca a estante e a prateleira onde ele está (aba ROOF → *Mapa 3D*, ou o ícone de RA nos detalhes do livro). Arraste para girar, use pinça para aproximar e alterne entre vista 3D e planta.
+- **Varredura com realidade aumentada (opcional):** em aparelhos com ARCore, como o Galaxy S24 FE, *Escanear (RA)* mede cada estante com a câmera e grava posição, largura, altura e orientação no mapa.
+
+### Como escanear a biblioteca
+
+1. Instale o “Google Play Services para RA” se o app pedir. Celulares sem ARCore continuam usando o mapa, com estantes em posição estimada ou medidas digitadas em *Medidas*.
+2. Marque **dois pontos de referência fixos no piso** (por exemplo, os dois lados da porta). Eles definem a origem do mapa. Use sempre os mesmos pontos para que estantes medidas em dias diferentes fiquem no mesmo mapa.
+3. Para cada estante: escolha-a (ou crie uma), fique de frente para ela e marque o **canto inferior esquerdo** e o **canto inferior direito**, rentes ao piso. Depois mire a **borda superior** para medir a altura, ou pule e digite. Confira profundidade, número de prateleiras e colunas e salve.
+4. Para o livro aparecer na prateleira certa, cadastre as posições com *Prateleira nº* e *Coluna nº* (ou textos como “Fileira 2, Prateleira 3”) e vincule o livro à posição.
+
+O S24 FE não tem sensor LiDAR/ToF. A profundidade vem do movimento da câmera, então a precisão costuma ficar em alguns centímetros com boa iluminação. Por isso o app mede estantes em vez de gerar uma malha 3D bruta da sala. A câmera é usada apenas no aparelho: nenhuma imagem é gravada ou enviada.
 
 Lembretes e widget são opcionais. O EducLib continua útil sem rede, sem notificações e sem criar conta.
 

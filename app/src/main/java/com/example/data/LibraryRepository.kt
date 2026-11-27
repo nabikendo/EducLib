@@ -329,7 +329,8 @@ class LibraryRepository(private val database: AppDatabase) {
         shelfDao.updateShelf(shelf)
     }
 
-    suspend fun deleteShelf(shelf: ShelfEntity) {
+    suspend fun deleteShelf(shelf: ShelfEntity) = database.withTransaction {
+        shelfDao.detachBooksFromShelf(shelf.id)
         shelfDao.deleteShelf(shelf)
     }
 
@@ -341,7 +342,8 @@ class LibraryRepository(private val database: AppDatabase) {
         shelfDao.updatePosition(position)
     }
 
-    suspend fun deletePosition(position: ShelfPositionEntity) {
+    suspend fun deletePosition(position: ShelfPositionEntity) = database.withTransaction {
+        shelfDao.detachBooksFromPosition(position.id)
         shelfDao.deletePosition(position)
     }
 
@@ -375,6 +377,7 @@ class LibraryRepository(private val database: AppDatabase) {
 
                 payload.shelves.orEmpty().forEach { shelfDao.insertShelf(it) }
                 payload.shelfPositions.orEmpty().forEach { shelfDao.insertPosition(it) }
+                val positionIds = payload.shelfPositions.orEmpty().map { it.id }.toSet()
                 payload.borrowers.orEmpty().forEach { borrower ->
                     borrowerDao.insertBorrower(
                         borrower.copy(
@@ -383,7 +386,7 @@ class LibraryRepository(private val database: AppDatabase) {
                         )
                     )
                 }
-                books.forEach { bookDao.insertBook(it) }
+                books.forEach { bookDao.insertBook(it.withKnownPosition(positionIds)) }
                 loans.forEach { loanDao.insertLoan(it) }
                 payload.reservations.orEmpty().forEach { reservationDao.insertReservation(it) }
                 payload.weeklySuggestions.orEmpty().forEach { weeklySuggestionDao.insertSuggestion(it) }
@@ -392,11 +395,20 @@ class LibraryRepository(private val database: AppDatabase) {
                 // reservas, estantes, sugestões e configurações do aparelho atual.
                 loanDao.deleteAllLoans()
                 bookDao.deleteAllBooks()
-                books.forEach { bookDao.insertBook(it) }
+                val positionIds = shelfDao.getAllPositions().map { it.id }.toSet()
+                books.forEach { bookDao.insertBook(it.withKnownPosition(positionIds)) }
                 loans.forEach { loanDao.insertLoan(it) }
             }
         }
     }
+
+    /**
+     * Versões anteriores apagavam estantes/posições sem desvincular os livros, gerando backups com
+     * `posicaoEstanteId` órfão. O vínculo não é uma FK do Room; descartá-lo é seguro e evita
+     * que esses backups fiquem impossíveis de restaurar.
+     */
+    private fun BookEntity.withKnownPosition(positionIds: Set<Int>): BookEntity =
+        if (posicaoEstanteId != null && posicaoEstanteId !in positionIds) copy(posicaoEstanteId = null) else this
 
     // --- Weekly Suggestions Operations ---
     val allSuggestions: Flow<List<WeeklySuggestionEntity>> = weeklySuggestionDao.getAllSuggestions()

@@ -49,7 +49,7 @@ gradle run
 gradle test
 ```
 
-`gradle packageDeb` gera o `.deb` no Linux; `gradle packageMsi packageExe` gera os instaladores no Windows. Para publicar, atualize `version` em `desktop/build.gradle.kts` e envie para a `main` uma tag `desktop-vX.Y.Z` igual à versão: o workflow *Release Desktop* gera os instaladores no Windows e no Ubuntu 22.04 e cria a release, sem marcá-la como a mais recente, para não interferir na atualização do app Android. O código sem dependência de Android (entidades, formato de backup, regras de empréstimo, busca e mapa 3D) fica em [`shared/`](shared) e é compilado pelos dois apps.
+`gradle packageDeb` gera o `.deb` no Linux; `gradle packageMsi packageExe` gera os instaladores no Windows. Para publicar, atualize `version` em `desktop/build.gradle.kts` na `main` e rode o workflow *Release Desktop (Windows e Linux)* em **Actions → Run workflow** (branch `main`), ou envie uma tag `desktop-vX.Y.Z` igual à versão. O workflow gera os instaladores no Windows e no Ubuntu 22.04 e cria a release com a tag. A release não é marcada como a mais recente, para não interferir na atualização do app Android. O código sem dependência de Android (entidades, formato de backup, regras de empréstimo, busca e mapa 3D) fica em [`shared/`](shared) e é compilado pelos dois apps.
 
 ## Privacidade e backup
 

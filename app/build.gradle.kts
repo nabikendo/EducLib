@@ -55,6 +55,11 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  // Código sem dependência de Android, compartilhado com o app de desktop (pasta desktop/).
+  sourceSets {
+    getByName("main") { kotlin.srcDir("../shared/src/main/kotlin") }
+    getByName("test") { kotlin.srcDir("../shared/src/test/kotlin") }
+  }
 }
 
 // Some unused dependencies are commented out below instead of being removed.
@@ -66,6 +71,8 @@ dependencies {
   implementation(libs.androidx.biometric)
   implementation(libs.androidx.appcompat)
   implementation(libs.journeyapps.zxing)
+  // ARCore opcional: só a varredura 3D da biblioteca usa; o app instala em aparelhos sem RA.
+  implementation(libs.google.ar.core)
   // implementation(libs.androidx.camera.camera2)
   // implementation(libs.androidx.camera.core)
   // implementation(libs.androidx.camera.lifecycle)

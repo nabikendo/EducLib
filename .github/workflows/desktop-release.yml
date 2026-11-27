@@ -1,0 +1,131 @@
+name: Release Desktop (Windows e Linux)
+
+# Publica os instaladores de computador a partir de uma tag `desktop-vX.Y.Z` em um commit da main.
+# Não usa o padrão `v*` do workflow do APK e não marca a release como "latest", para não interferir
+# no verificador de atualização do app Android (que procura o APK na release mais recente).
+on:
+  push:
+    tags:
+      - 'desktop-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Ensure release commit is contained in main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "Release tags must point to a commit contained in main." >&2
+            exit 1
+          fi
+      - name: Check tag matches desktop version
+        id: version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#desktop-v}"
+          BUILD_VERSION="$(sed -n 's/^version = "\(.*\)"$/\1/p' desktop/build.gradle.kts)"
+          if [ "$TAG_VERSION" != "$BUILD_VERSION" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match desktop version $BUILD_VERSION." >&2
+            exit 1
+          fi
+          echo "version=$BUILD_VERSION" >> "$GITHUB_OUTPUT"
+
+  package:
+    needs: verify
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          # Ubuntu 22.04: dependências do .deb com nomes aceitos pelo Zorin OS 17 (base 22.04) e 18 (base 24.04).
+          - os: ubuntu-22.04
+            tasks: packageDeb
+            artifact: linux
+            files: desktop/build/compose/binaries/main/deb/*.deb
+          - os: windows-latest
+            tasks: packageMsi packageExe
+            artifact: windows
+            files: |
+              desktop/build/compose/binaries/main/msi/*.msi
+              desktop/build/compose/binaries/main/exe/*.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.9.1'
+      - name: Run desktop tests
+        run: gradle test --stacktrace
+      - name: Build installers
+        run: gradle ${{ matrix.tasks }} --stacktrace
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  release:
+    needs: [verify, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Name files and compute checksums
+        working-directory: dist
+        run: |
+          V="${{ needs.verify.outputs.version }}"
+          for f in *.msi; do mv "$f" "EducLib-Desktop-$V-Windows.msi"; done
+          for f in *.exe; do mv "$f" "EducLib-Desktop-$V-Windows-instalador.exe"; done
+          for f in *.deb; do mv "$f" "EducLib-Desktop-$V-Linux-amd64.deb"; done
+          sha256sum EducLib-Desktop-* > SHA256SUMS.txt
+          ls -la
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          V="${{ needs.verify.outputs.version }}"
+          cat > notes.md <<NOTES
+          Primeira versão do EducLib para computador, com o mesmo formato de dados do app Android.
+
+          **O que tem:** acervo, leitores, empréstimos e devoluções (prazos, devolução parcial, renovação e bloqueio por atraso iguais aos do Android), estantes e o mapa 3D com busca de livros. A medição com realidade aumentada continua só no Android.
+
+          **Instalar**
+          - **Windows:** baixe \`EducLib-Desktop-$V-Windows.msi\` e execute. A instalação é por usuário e não pede administrador. O instalador não tem assinatura digital; se o Windows mostrar "O Windows protegeu o computador", clique em *Mais informações → Executar assim mesmo*.
+          - **Zorin OS / Ubuntu / Debian (64 bits):** baixe \`EducLib-Desktop-$V-Linux-amd64.deb\` e abra com o instalador de programas, ou rode \`sudo apt install ./EducLib-Desktop-$V-Linux-amd64.deb\`. O EducLib aparece no menu, em *Educação*.
+
+          Os instaladores já trazem o Java. Para conferir os arquivos, use \`SHA256SUMS.txt\`.
+
+          **Dados:** ficam só no computador (\`%APPDATA%\\EducLib\` ou \`~/.local/share/educlib\`). Para trazer o acervo do celular, exporte o backup JSON no Android e use *Backup → Importar backup*; a importação substitui os dados do computador.
+
+          Licença: GPL-3.0-or-later.
+          NOTES
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "EducLib Desktop $V (Windows e Linux)" \
+            --notes-file notes.md \
+            --latest=false \
+            --verify-tag

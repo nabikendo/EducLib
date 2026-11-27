@@ -51,8 +51,16 @@ class LibraryRepository(private val database: AppDatabase) {
         bookDao.updateBook(book)
     }
 
-    suspend fun deleteBook(book: BookEntity) {
+    /**
+     * Exclui o livro se ninguém estiver com ele. Devolve o motivo da recusa, ou nulo se excluiu.
+     * Empréstimos devolvidos ficam como histórico; reservas do livro são removidas junto, na mesma
+     * transação, para que o próximo backup continue restaurável.
+     */
+    suspend fun deleteBook(book: BookEntity): String? = database.withTransaction {
+        bookDeletionRefusal(book, loanDao.getAllLoansSnapshot())?.let { return@withTransaction it }
+        reservationDao.deleteReservationsForBook(book.id)
         bookDao.deleteBook(book)
+        null
     }
 
     // --- Loan Operations ---
@@ -79,10 +87,9 @@ class LibraryRepository(private val database: AppDatabase) {
             return@withTransaction false // Not enough copies available to loan
         }
 
-        val studentLoanDays = configDao.getConfig("student_loan_days")?.value?.toLongOrNull() ?: 7L
-        val teacherLoanDays = configDao.getConfig("teacher_loan_days")?.value?.toLongOrNull() ?: 15L
-        val defaultDays = if (borrowerClass.startsWith("Prof", ignoreCase = true)) teacherLoanDays else studentLoanDays
-        val dueDate = loanDate + (defaultDays * 24 * 60 * 60 * 1000)
+        val studentLoanDays = configDao.getConfig("student_loan_days")?.value?.toLongOrNull() ?: DEFAULT_STUDENT_LOAN_DAYS
+        val teacherLoanDays = configDao.getConfig("teacher_loan_days")?.value?.toLongOrNull() ?: DEFAULT_TEACHER_LOAN_DAYS
+        val dueDate = loanDueDate(borrowerClass, loanDate, studentLoanDays, teacherLoanDays)
         val loan = LoanEntity(
             bookId = bookId,
             bookTitle = book.title,
@@ -97,13 +104,7 @@ class LibraryRepository(private val database: AppDatabase) {
         loanDao.insertLoan(loan)
 
         // Decrement available quantity by the requested amount and update usage statistics
-        val updatedBook = book.copy(
-            availableQuantity = book.availableQuantity - quantity,
-            totalLoans = book.totalLoans + quantity,
-            useFrequency = book.useFrequency + quantity,
-            lastLoanDate = loanDate
-        )
-        bookDao.updateBook(updatedBook)
+        bookDao.updateBook(book.afterLoan(quantity, loanDate))
 
         return@withTransaction true
     }
@@ -117,55 +118,19 @@ class LibraryRepository(private val database: AppDatabase) {
         returnDate: Long = System.currentTimeMillis()
     ): Boolean = database.withTransaction {
         val loan = loanDao.getLoanById(loanId) ?: return@withTransaction false
-        if (loan.returnDate != null) {
-            return@withTransaction false // Already returned
-        }
+        val outcome = loan.applyReturn(returnedQuantity, returnDate) ?: return@withTransaction false // already returned
 
-        val actualReturned = if (returnedQuantity <= 0 || returnedQuantity >= loan.quantity) {
-            loan.quantity
-        } else {
-            returnedQuantity
-        }
+        loanDao.updateLoan(outcome.updatedLoan)
+        // Partial return: keep the returned copies in history as a separate record.
+        outcome.returnedRecord?.let { loanDao.insertLoan(it) }
 
-        if (actualReturned == loan.quantity) {
-            // Full return
-            val updatedLoan = loan.copy(returnDate = returnDate)
-            loanDao.updateLoan(updatedLoan)
-        } else {
-            // Partial return!
-            // Update the quantity of the current active loan
-            val updatedLoan = loan.copy(quantity = loan.quantity - actualReturned)
-            loanDao.updateLoan(updatedLoan)
-
-            // Insert a new LoanEntity for the returned ones so we keep history
-            val historicReturnedLoan = loan.copy(
-                id = 0, // autoGenerate new ID
-                quantity = actualReturned,
-                returnDate = returnDate
-            )
-            loanDao.insertLoan(historicReturnedLoan)
-        }
-
-        // Increment book available quantity by the returned amount
-        val book = bookDao.getBookById(loan.bookId)
-        if (book != null) {
-            // Keep it bounded with totalQuantity
-            val newAvailable = (book.availableQuantity + actualReturned).coerceAtMost(book.totalQuantity)
-            val updatedBook = book.copy(availableQuantity = newAvailable)
-            bookDao.updateBook(updatedBook)
-        }
+        bookDao.getBookById(loan.bookId)?.let { bookDao.updateBook(it.afterReturn(outcome.returnedQuantity)) }
 
         // Apply block logic if late
-        if (returnDate > loan.dueDate) {
-            val overdueDays = ((returnDate - loan.dueDate) / (1000 * 60 * 60 * 24)).toLong()
-            if (overdueDays > 0) {
-                // To fetch borrower we might need borrowerDao
-                val borrower = borrowerDao.getBorrowerByName(loan.borrowerName)
-                if (borrower != null) {
-                    val currentBlockedUntil = borrower.blockedUntil ?: System.currentTimeMillis()
-                    val newBlockedUntil = maxOf(currentBlockedUntil, System.currentTimeMillis()) + (overdueDays * 24 * 60 * 60 * 1000)
-                    borrowerDao.updateBorrower(borrower.copy(blockedUntil = newBlockedUntil))
-                }
+        val borrower = borrowerDao.getBorrowerByName(loan.borrowerName)
+        if (borrower != null) {
+            penaltyBlockedUntil(loan, returnDate, borrower.blockedUntil, System.currentTimeMillis())?.let {
+                borrowerDao.updateBorrower(borrower.copy(blockedUntil = it))
             }
         }
 
@@ -195,8 +160,7 @@ class LibraryRepository(private val database: AppDatabase) {
         if (loan.returnDate != null) {
             return false // Cannot renew returned student/teacher books
         }
-        val oneWeekInMillis = 7L * 24 * 60 * 60 * 1000
-        val updated = loan.copy(dueDate = loan.dueDate + oneWeekInMillis)
+        val updated = loan.copy(dueDate = loan.dueDate + RENEWAL_DAYS * DAY_MS)
         loanDao.updateLoan(updated)
         return true
     }
@@ -329,7 +293,8 @@ class LibraryRepository(private val database: AppDatabase) {
         shelfDao.updateShelf(shelf)
     }
 
-    suspend fun deleteShelf(shelf: ShelfEntity) {
+    suspend fun deleteShelf(shelf: ShelfEntity) = database.withTransaction {
+        shelfDao.detachBooksFromShelf(shelf.id)
         shelfDao.deleteShelf(shelf)
     }
 
@@ -341,7 +306,8 @@ class LibraryRepository(private val database: AppDatabase) {
         shelfDao.updatePosition(position)
     }
 
-    suspend fun deletePosition(position: ShelfPositionEntity) {
+    suspend fun deletePosition(position: ShelfPositionEntity) = database.withTransaction {
+        shelfDao.detachBooksFromPosition(position.id)
         shelfDao.deletePosition(position)
     }
 
@@ -375,6 +341,7 @@ class LibraryRepository(private val database: AppDatabase) {
 
                 payload.shelves.orEmpty().forEach { shelfDao.insertShelf(it) }
                 payload.shelfPositions.orEmpty().forEach { shelfDao.insertPosition(it) }
+                val positionIds = payload.shelfPositions.orEmpty().map { it.id }.toSet()
                 payload.borrowers.orEmpty().forEach { borrower ->
                     borrowerDao.insertBorrower(
                         borrower.copy(
@@ -383,20 +350,30 @@ class LibraryRepository(private val database: AppDatabase) {
                         )
                     )
                 }
-                books.forEach { bookDao.insertBook(it) }
+                books.forEach { bookDao.insertBook(it.withKnownPosition(positionIds)) }
                 loans.forEach { loanDao.insertLoan(it) }
-                payload.reservations.orEmpty().forEach { reservationDao.insertReservation(it) }
+                val bookIds = books.map { it.id }.toSet()
+                payload.reservations.orEmpty().filter { it.bookId in bookIds }.forEach { reservationDao.insertReservation(it) }
                 payload.weeklySuggestions.orEmpty().forEach { weeklySuggestionDao.insertSuggestion(it) }
             } else {
                 // Backups v1 só continham livros/empréstimos: preserva leitores,
                 // reservas, estantes, sugestões e configurações do aparelho atual.
                 loanDao.deleteAllLoans()
                 bookDao.deleteAllBooks()
-                books.forEach { bookDao.insertBook(it) }
+                val positionIds = shelfDao.getAllPositions().map { it.id }.toSet()
+                books.forEach { bookDao.insertBook(it.withKnownPosition(positionIds)) }
                 loans.forEach { loanDao.insertLoan(it) }
             }
         }
     }
+
+    /**
+     * Versões anteriores apagavam estantes/posições sem desvincular os livros, gerando backups com
+     * `posicaoEstanteId` órfão. O vínculo não é uma FK do Room; descartá-lo é seguro e evita
+     * que esses backups fiquem impossíveis de restaurar.
+     */
+    private fun BookEntity.withKnownPosition(positionIds: Set<Int>): BookEntity =
+        if (posicaoEstanteId != null && posicaoEstanteId !in positionIds) copy(posicaoEstanteId = null) else this
 
     // --- Weekly Suggestions Operations ---
     val allSuggestions: Flow<List<WeeklySuggestionEntity>> = weeklySuggestionDao.getAllSuggestions()

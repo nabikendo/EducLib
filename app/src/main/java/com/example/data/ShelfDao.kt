@@ -52,4 +52,12 @@ interface ShelfDao {
 
     @Delete
     suspend fun deletePosition(position: ShelfPositionEntity)
+
+    // `books.posicaoEstanteId` não tem chave estrangeira: ao remover estantes/posições é preciso
+    // desvincular os livros manualmente, senão o backup seguinte aponta para posições inexistentes.
+    @Query("UPDATE books SET posicaoEstanteId = NULL WHERE posicaoEstanteId IN (SELECT id FROM shelf_positions WHERE shelfId = :shelfId)")
+    suspend fun detachBooksFromShelf(shelfId: Int)
+
+    @Query("UPDATE books SET posicaoEstanteId = NULL WHERE posicaoEstanteId = :positionId")
+    suspend fun detachBooksFromPosition(positionId: Int)
 }

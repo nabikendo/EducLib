@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [BookEntity::class, LoanEntity::class, ConfigEntity::class, BorrowerEntity::class, ReservationEntity::class, ShelfEntity::class, ShelfPositionEntity::class, WeeklySuggestionEntity::class], version = 9, exportSchema = false)
+@Database(entities = [BookEntity::class, LoanEntity::class, ConfigEntity::class, BorrowerEntity::class, ReservationEntity::class, ShelfEntity::class, ShelfPositionEntity::class, WeeklySuggestionEntity::class], version = 10, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun bookDao(): BookDao
     abstract fun loanDao(): LoanDao
@@ -111,6 +111,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** Layout físico das estantes para o mapa 3D e limpeza de vínculos de posição órfãos. */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "mapX" to "REAL DEFAULT NULL",
+                    "mapZ" to "REAL DEFAULT NULL",
+                    "rotationDeg" to "REAL NOT NULL DEFAULT 0.0",
+                    "widthM" to "REAL NOT NULL DEFAULT ${ShelfEntity.DEFAULT_WIDTH_M}",
+                    "depthM" to "REAL NOT NULL DEFAULT ${ShelfEntity.DEFAULT_DEPTH_M}",
+                    "heightM" to "REAL NOT NULL DEFAULT ${ShelfEntity.DEFAULT_HEIGHT_M}",
+                    "levelCount" to "INTEGER NOT NULL DEFAULT ${ShelfEntity.DEFAULT_LEVEL_COUNT}",
+                    "columnCount" to "INTEGER NOT NULL DEFAULT 1",
+                    "layoutSource" to "TEXT NOT NULL DEFAULT ''"
+                )
+                for ((name, definition) in columns) {
+                    db.execSQL("ALTER TABLE `shelves` ADD COLUMN `$name` $definition")
+                }
+                db.execSQL(
+                    "UPDATE `books` SET `posicaoEstanteId` = NULL WHERE `posicaoEstanteId` IS NOT NULL " +
+                        "AND `posicaoEstanteId` NOT IN (SELECT `id` FROM `shelf_positions`)"
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             val tempInstance = INSTANCE
             if (tempInstance != null) {
@@ -126,7 +150,7 @@ abstract class AppDatabase : RoomDatabase() {
                         AppDatabase::class.java,
                         "school_library_db"
                     )
-                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     .build()
 
                     try {

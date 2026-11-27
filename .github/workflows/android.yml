@@ -41,6 +41,30 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Cache Robolectric Android runtime
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric/android-all-instrumented
+          key: robolectric-android-all-instrumented-15-robolectric-13954326-i7
+
+      # O Robolectric baixaria esse runtime (~200 MB) do Maven Central durante os testes, sem retry; com
+      # HTTP 429 os testes falhavam. Ele procura primeiro no repositório Maven local (~/.m2), então o
+      # arquivo é baixado antes, com novas tentativas, e guardado em cache. A versão é a que o
+      # Robolectric 4.16.1 usa para @Config(sdk = [35]); atualize ao trocar Robolectric ou o SDK dos testes.
+      - name: Fetch Robolectric Android runtime
+        run: |
+          P=org/robolectric/android-all-instrumented/15-robolectric-13954326-i7
+          F=android-all-instrumented-15-robolectric-13954326-i7
+          D="$HOME/.m2/repository/$P"
+          mkdir -p "$D"
+          for ext in pom jar; do
+            if [ ! -s "$D/$F.$ext" ]; then
+              curl -fsSL --retry 6 --retry-all-errors --retry-delay 30 -o "$D/$F.$ext.part" "https://repo1.maven.org/maven2/$P/$F.$ext"
+              mv "$D/$F.$ext.part" "$D/$F.$ext"
+            fi
+          done
+          ls -la "$D"
+
       - name: Run focused unit tests
         run: |
           if [ -f "./gradlew" ]; then
